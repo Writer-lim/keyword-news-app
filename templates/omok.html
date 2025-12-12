@@ -17,7 +17,7 @@
         }
         .container { 
             max-width: 600px; 
-            margin: 20px; 
+            margin: 20px auto; /* 중앙 정렬 */
             padding: 20px; 
             background: white; 
             border-radius: 8px; 
@@ -40,6 +40,7 @@
             /* width/height는 JS에서 동적으로 설정 */
         }
         
+        /* Lines와 Intersections는 padding을 상쇄하고 보드판의 실제 선 영역만 차지함 */
         #lines, #intersections {
             position: absolute;
             top: 15px; 
@@ -55,6 +56,7 @@
         .line-h { height: 1px; left: 0; right: 0; transform: translateY(-0.5px); }
         .line-v { width: 1px; top: 0; bottom: 0; transform: translateX(-0.5px); }
         
+        /* **착수 위치 정렬 핵심** */
         .intersection {
             position: absolute;
             cursor: pointer;
@@ -66,6 +68,7 @@
             position: absolute;
             top: 50%;
             left: 50%;
+            /* 돌을 정확히 intersection div 중앙에 위치 */
             transform: translate(-50%, -50%); 
         }
         .black { background-color: black; z-index: 20; }
@@ -84,9 +87,10 @@
         @media (max-width: 600px) {
              .container { padding: 10px; }
              #board-wrapper { 
+                 /* 화면 너비의 95%를 사용하고, 그 크기를 기준으로 내부를 채움 */
                  width: calc(95vw - 30px);
                  height: calc(95vw - 30px);
-                 max-width: 570px;
+                 max-width: 570px; /* PC에서도 max-width 제한 */
                  max-height: 570px;
                  padding: 15px; 
              }
@@ -143,15 +147,17 @@
         let aiDepth = 3; 
 
         window.addEventListener('resize', () => {
-             if (!gameOver) initializeBoard(); // 크기가 변하면 보드 재생성 (정렬 문제 방지)
+             // 크기가 변하면 보드 재생성 (정렬 문제 방지)
+             if (!gameOver) initializeBoard(); 
         });
 
         // -- 초기화 및 UI 로직 (정렬 문제 해결) --
 
         function initializeBoard() {
-             // 1. CELL_SIZE 계산 (매우 중요: 보드 정렬의 핵심)
-             const boardInnerWidth = boardWrapper.clientWidth - 30; // wrapperWidth - padding (15*2)
-             CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1); // 14개 간격으로 나눔
+             // 1. CELL_SIZE 계산 (보드 정렬의 핵심)
+             // boardWrapper의 padding을 뺀 실제 보드판 크기
+             const boardInnerWidth = boardWrapper.clientWidth - 30; 
+             CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1); 
              
              // 2. Lines 및 Intersections 컨테이너 크기 설정
              const linesSize = (BOARD_SIZE - 1) * CELL_SIZE;
@@ -168,12 +174,12 @@
             for (let i = 0; i < BOARD_SIZE; i++) {
                 const hLine = document.createElement('div');
                 hLine.className = 'line-h';
-                hLine.style.top = `${i * CELL_SIZE}px`; // 선 위치
+                hLine.style.top = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(hLine);
 
                 const vLine = document.createElement('div');
                 vLine.className = 'line-v';
-                vLine.style.left = `${i * CELL_SIZE}px`; // 선 위치
+                vLine.style.left = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(vLine);
             }
 
@@ -183,10 +189,9 @@
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // 각 교차점의 위치: r * CELL_SIZE (정확히 선이 지나가는 위치)
+                    // 위치와 크기를 동적으로 설정
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
-                    // 교차점 클릭 영역 크기: CELL_SIZE 크기
                     intersection.style.width = `${CELL_SIZE}px`;
                     intersection.style.height = `${CELL_SIZE}px`;
 
@@ -272,6 +277,7 @@
 
                 placeStone(r, c, 1); // 흑돌 착수
                 
+                // **[요청 4] 턴 전환: 착수 완료 후 백돌 턴으로 넘김**
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
                     // AI 턴: 비동기 처리
@@ -289,12 +295,15 @@
                 statusElement.textContent = `${winner} 승리! 🎉`;
                 gameOver = true;
             } else {
-                // **[요청 4] 턴 전환: 착수 완료 후 반드시 턴을 넘김**
+                // **턴 전환**
                 currentPlayer = player === 1 ? 2 : 1; 
                 
                 if (currentMode !== 'ai-ai') {
-                    const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌 (AI)';
-                    statusElement.textContent = `${nextPlayer} 차례입니다.`;
+                    // 사용자 vs AI 모드에서는 AI 턴 시작 직전에 UI 업데이트를 makeAIMove 함수로 이관했음.
+                    // AI vs AI 모드에서만 다음 턴을 준비함.
+                    if (currentPlayer === 1) { // AI vs AI 모드에서만
+                       statusElement.textContent = `흑돌 차례입니다.`;
+                    }
                 }
             }
         }
@@ -318,10 +327,49 @@
             }
         }
 
-        // ... (runAIGame, makeAIMove, findBestMove, checkWin 함수 유지) ...
-        function runAIGame() { /* ... */ }
-        function makeAIMove(isAIVsAI = false) { /* ... */ }
-        function findBestMove(player, depth) { /* ... */ return {r: 7, c: 7}; } 
+        // -- AI 로직 --
+        
+        function makeAIMove(isAIVsAI = false) {
+            if (gameOver || currentPlayer !== 2) return; // AI는 백돌(2)만 움직임.
+
+            const aiPlayer = currentPlayer; 
+            
+            // 임시 AI 로직 (Minimax 함수 대신 랜덤 선택 또는 간단한 첫 수 중앙 착수)
+            let bestMove = findBestMove(aiPlayer, aiDepth); 
+            
+            // AI가 백일 경우, 흑돌 주변에 착수하는 임의 로직
+            if (aiPlayer === 2 && board.flat().filter(val => val !== 0).length === 1) {
+                // 흑돌이 (7, 7)에 있다고 가정하고 (6, 7)에 착수
+                bestMove = { r: 6, c: 7 }; 
+            }
+
+            if (bestMove) {
+                placeStone(bestMove.r, bestMove.c, aiPlayer);
+            }
+            
+            if (isAIVsAI && !gameOver) {
+                 const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌';
+                 statusElement.textContent = `${nextPlayer} 차례입니다.`;
+            } else if (!gameOver) {
+                // 사용자 vs AI 모드에서 AI 착수 후 다시 흑돌 차례로 UI 업데이트
+                statusElement.textContent = '흑돌 차례입니다.';
+            }
+        }
+
+
+        // --- Minimax 및 평가 함수 (더미 함수 유지) ---
+        function findBestMove(player, depth) { 
+             const empty = [];
+             for(let r=0; r<BOARD_SIZE; r++) {
+                 for(let c=0; c<BOARD_SIZE; c++) {
+                     if(board[r][c] === 0) empty.push({r, c});
+                 }
+             }
+             if (empty.length > 0) {
+                 return empty[Math.floor(Math.random() * empty.length)]; // 임시 랜덤
+             }
+             return null;
+        } 
         function checkWin(r, c, player) { /* ... */ return false; }
 
 
