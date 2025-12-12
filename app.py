@@ -55,6 +55,13 @@ def news_searcher():
 def omok():
     return render_template('omok.html')
 
+# ==========================================================
+# 4. 바둑 게임 페이지 (새로 추가)
+# ==========================================================
+@app.route('/baduk')
+def baduk():
+    return render_template('baduk.html')
+
 
 if __name__ == '__main__':
     app.run(debug=True)

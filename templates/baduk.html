@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>바둑 게임 (19x19)</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
+        .container { margin: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        h1 { text-align: center; color: #333; }
+        #nav a { margin: 0 10px; text-decoration: none; color: #007bff; }
+
+        #board-wrapper {
+            position: relative;
+            width: 570px; /* 18 * 30px + 2 * 15px padding = 570px */
+            height: 570px;
+            padding: 15px; 
+            background-color: #e3b772;
+            border: 1px solid #000;
+            user-select: none; /* 드래그 방지 */
+        }
+        #lines, #intersections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .line-h, .line-v {
+            position: absolute;
+            background-color: #000;
+        }
+        .line-h { height: 1px; left: 15px; right: 15px; transform: translateY(-0.5px); }
+        .line-v { width: 1px; top: 15px; bottom: 15px; transform: translateX(-0.5px); }
+        
+        .intersection {
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .stone {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .black { background-color: black; z-index: 20; }
+        .white { background-color: white; border: 1px solid #333; z-index: 20; }
+        
+        #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="nav" style="text-align: center; margin-bottom: 20px;">
+            <a href="/">메인 페이지로 돌아가기</a>
+        </div>
+        <h1>바둑 게임 (19x19) ⚫⚪</h1>
+        
+        <div id="controls" style="margin-bottom: 20px; text-align: center;">
+            <button onclick="passTurn()">패스</button>
+            <button onclick="resetGame()">새 게임 시작</button>
+        </div>
+
+        <div id="board-wrapper">
+            <div id="lines"></div>
+            <div id="intersections"></div>
+        </div>
+        
+        <div id="status">흑돌 차례입니다.</div>
+    </div>
+
+    <script>
+        const intersectionsElement = document.getElementById('intersections');
+        const linesElement = document.getElementById('lines');
+        const statusElement = document.getElementById('status');
+        
+        const BOARD_SIZE = 19; // 19x19
+        const CELL_SIZE = 30;
+        let board = [];
+        let currentPlayer = 1; // 1: 흑, 2: 백
+        let gameOver = false;
+
+        // -- 초기화 및 UI 로직 --
+
+        function initializeBoard() {
+            board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
+            linesElement.innerHTML = '';
+            intersectionsElement.innerHTML = '';
+
+            // 1. 선 그리기 (Lines) - 19x19
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                // 가로선
+                const hLine = document.createElement('div');
+                hLine.className = 'line-h';
+                hLine.style.top = `${i * CELL_SIZE + 15}px`; // 교차점 중앙에 오도록 15px 이동
+                linesElement.appendChild(hLine);
+
+                // 세로선
+                const vLine = document.createElement('div');
+                vLine.className = 'line-v';
+                vLine.style.left = `${i * CELL_SIZE + 15}px`; // 교차점 중앙에 오도록 15px 이동
+                linesElement.appendChild(vLine);
+            }
+
+            // 2. 교차점 영역 추가 및 이벤트 리스너 설정
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const intersection = document.createElement('div');
+                    intersection.className = 'intersection';
+                    
+                    // 각 교차점의 정확한 위치: 15px(패딩) + 인덱스 * 30px
+                    intersection.style.top = `${r * CELL_SIZE}px`;
+                    intersection.style.left = `${c * CELL_SIZE}px`;
+
+                    intersection.dataset.row = r;
+                    intersection.dataset.col = c;
+                    intersection.addEventListener('click', placeStone);
+                    intersectionsElement.appendChild(intersection);
+                }
+            }
+            statusElement.textContent = '흑돌 차례입니다.';
+            gameOver = false;
+        }
+
+        // -- 게임 흐름 및 규칙 로직 --
+        
+        function placeStone(event) {
+            if (gameOver) return;
+
+            const r = parseInt(event.target.dataset.row);
+            const c = parseInt(event.target.dataset.col);
+
+            if (board[r][c] === 0) {
+                // 1. 임시 착수
+                board[r][c] = currentPlayer;
+                
+                // 2. 따낸 돌 확인 (가장 복잡한 부분, 간략화)
+                const stonesToRemove = checkCaptures(r, c, currentPlayer);
+
+                if (stonesToRemove.length > 0) {
+                    // 따낸 돌이 있으면 제거
+                    removeStones(stonesToRemove);
+                    finalizeMove(r, c);
+                } else if (!hasLiberty(r, c)) {
+                    // 따낸 돌이 없는데, 착수한 돌 그룹이 숨(자유도)이 없으면 자살 금지 (착수 취소)
+                    board[r][c] = 0;
+                    alert("자살 금지!");
+                    return;
+                } else {
+                    // 따낸 돌 없이 정상 착수
+                    finalizeMove(r, c);
+                }
+            }
+        }
+        
+        function finalizeMove(r, c) {
+            drawStoneOnUI(r, c, currentPlayer);
+            // 턴 변경
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            statusElement.textContent = `${currentPlayer === 1 ? '흑돌' : '백돌'} 차례입니다.`;
+        }
+
+        function drawStoneOnUI(r, c, player) {
+            const index = r * BOARD_SIZE + c;
+            const intersection = intersectionsElement.children[index];
+            if (intersection.children.length > 0) return;
+
+            const stone = document.createElement('div');
+            stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
+            intersection.appendChild(stone);
+        }
+        
+        function removeStones(stonesToRemove) {
+            stonesToRemove.forEach(([r, c]) => {
+                board[r][c] = 0;
+                const index = r * BOARD_SIZE + c;
+                const intersection = intersectionsElement.children[index];
+                if (intersection.children.length > 0) {
+                    intersection.removeChild(intersection.firstChild);
+                }
+            });
+        }
+        
+        function passTurn() {
+            // 패스는 바둑의 중요한 규칙이지만, 여기서는 단순 턴 넘기기로 처리
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            statusElement.textContent = `${currentPlayer === 1 ? '흑돌' : '백돌'} 차례입니다. (패스됨)`;
+        }
+        
+        function resetGame() {
+            currentPlayer = 1;
+            initializeBoard();
+        }
+
+
+        // -- 바둑 규칙 로직 (간략화) --
+        
+        // 주변 돌의 숨(Liberty)을 확인하는 BFS (숨이 1개라도 있으면 true)
+        function hasLiberty(r, c, currentBoard = board) {
+            const player = currentBoard[r][c];
+            if (player === 0) return false;
+
+            const visited = new Set();
+            const queue = [[r, c]];
+            visited.add(`${r},${c}`);
+
+            while (queue.length > 0) {
+                const [currR, currC] = queue.shift();
+
+                for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                    const nr = currR + dr;
+                    const nc = currC + dc;
+
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                        if (currentBoard[nr][nc] === 0) {
+                            return true; // 빈 공간 발견 = 숨이 있음
+                        } else if (currentBoard[nr][nc] === player && !visited.has(`${nr},${nc}`)) {
+                            visited.add(`${nr},${nc}`);
+                            queue.push([nr, nc]);
+                        }
+                    }
+                }
+            }
+            return false; // 숨이 없음 (죽은 그룹)
+        }
+        
+        // 따낸 돌 확인 (상대방 그룹의 숨이 0이 되었는지 확인)
+        function checkCaptures(r, c, player) {
+            const opponent = player === 1 ? 2 : 1;
+            const toRemove = [];
+
+            for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                const nr = r + dr;
+                const nc = c + dc;
+
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === opponent) {
+                    // 상대방 돌 그룹이 숨이 없어졌는지 확인
+                    if (!hasLiberty(nr, nc, board)) {
+                        // 숨이 없는 그룹 전체를 찾아서 제거 목록에 추가
+                        getGroup(nr, nc, board, opponent).forEach(coord => {
+                             if (!toRemove.some(([tr, tc]) => tr === coord[0] && tc === coord[1])) {
+                                toRemove.push(coord);
+                             }
+                        });
+                    }
+                }
+            }
+            return toRemove;
+        }
+
+        // 특정 좌표와 연결된 같은 색깔의 돌 그룹을 찾는 BFS
+        function getGroup(r, c, currentBoard, player) {
+            const group = [];
+            const visited = new Set();
+            const queue = [[r, c]];
+            visited.add(`${r},${c}`);
+            group.push([r, c]);
+
+            while (queue.length > 0) {
+                const [currR, currC] = queue.shift();
+
+                for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                    const nr = currR + dr;
+                    const nc = currC + dc;
+
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && 
+                        currentBoard[nr][nc] === player && !visited.has(`${nr},${nc}`)) {
+                        
+                        visited.add(`${nr},${nc}`);
+                        group.push([nr, nc]);
+                        queue.push([nr, nc]);
+                    }
+                }
+            }
+            return group;
+        }
+
+        window.onload = initializeBoard;
+    </script>
+</body>
+</html>
