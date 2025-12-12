@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>오목 게임 (AI 기능) 🔴⚫</title>
+    <title>오목 게임 (고성능 AI) 🔴⚫</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f4f4f9; }
+        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
         .container { max-width: 600px; margin: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
         h1 { text-align: center; color: #333; }
         #nav a { margin: 0 10px; text-decoration: none; color: #007bff; }
@@ -13,47 +13,68 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
         
-        #board-container { border: 1px solid #000; box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); }
+        #board-wrapper {
+            position: relative;
+            width: 450px; /* 14 * 30px + 2 * 15px padding = 450px */
+            height: 450px;
+            padding: 15px; /* 격자점 중앙에 돌을 놓기 위한 간격 */
+            background-color: #e3b772;
+            border: 2px solid #000;
+        }
         #board {
             display: grid;
-            grid-template-columns: repeat(15, 30px);
-            grid-template-rows: repeat(15, 30px);
-            background-color: #e3b772; /* 나무판 색상 */
-        }
-        .cell {
-            width: 30px;
-            height: 30px;
-            border: 1px solid #000;
-            border-top: none; 
-            border-left: none;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
+            grid-template-columns: repeat(14, 30px);
+            grid-template-rows: repeat(14, 30px);
+            width: 420px; /* 14 * 30px */
+            height: 420px;
             position: relative;
         }
-        /* 중앙 십자가만 보이게 설정 */
-        .cell:nth-child(15n + 1) { border-left: 1px solid #000; }
-        .cell:nth-child(-n + 15) { border-top: 1px solid #000; }
+        .line-h {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background-color: #000;
+            transform: translateY(-0.5px);
+        }
+        .line-v {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: #000;
+            transform: translateX(-0.5px);
+        }
+        
+        .intersection {
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            cursor: pointer;
+            z-index: 10;
+        }
         
         .stone {
-            width: 25px;
-            height: 25px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* 정확히 교차점 중앙에 위치 */
         }
-        .black { background-color: black; }
-        .white { background-color: white; border: 1px solid #333; }
+        .black { background-color: black; z-index: 20; }
+        .white { background-color: white; border: 1px solid #333; z-index: 20; }
+        
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="nav" style="text-align: center; margin-bottom: 20px;">
-            <a href="/">뉴스 검색기로 돌아가기</a>
+            <a href="/">메인 페이지로 돌아가기</a>
         </div>
-        <h1>오목 게임 🔴⚫</h1>
+        <h1>오목 AI 대전 🔴⚫</h1>
         
         <div id="controls">
             <div style="margin-bottom: 10px;">
@@ -64,51 +85,83 @@
             <div>
                 <label for="difficulty">AI 난이도:</label>
                 <select id="difficulty">
-                    <option value="1">하수</option>
-                    <option value="2" selected>중수</option>
-                    <option value="3">고수</option>
+                    <option value="1">하수 (Depth 1-2)</option>
+                    <option value="2" selected>중수 (Depth 3-4)</option>
+                    <option value="3">고수 (Depth 5+)</option>
                 </select>
                 <button onclick="startGame()">새 게임 시작</button>
             </div>
         </div>
 
-        <div id="board-container">
-             <div id="board"></div>
+        <div id="board-wrapper">
+            <div id="lines"></div>
+            <div id="intersections"></div>
         </div>
         
         <div id="status">게임을 시작해 주세요.</div>
     </div>
 
     <script>
-        const boardElement = document.getElementById('board');
+        const boardWrapper = document.getElementById('board-wrapper');
+        const linesElement = document.getElementById('lines');
+        const intersectionsElement = document.getElementById('intersections');
         const statusElement = document.getElementById('status');
         const difficultySelect = document.getElementById('difficulty');
         const modeButtons = document.querySelectorAll('#controls button[data-mode]');
         
-        const BOARD_SIZE = 15;
+        const BOARD_SIZE = 15; // 0부터 14까지 인덱스 사용
+        const CELL_SIZE = 30;
         let board = [];
         let currentPlayer = 1; // 1: 흑(사용자/선공), 2: 백(AI/후공)
         let gameOver = false;
         let currentMode = 'user-ai';
-        let aiDepth = 2; // 기본 중수
+        let aiDepth = 3; 
 
         // -- 초기화 및 UI 로직 --
 
         function initializeBoard() {
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
-            boardElement.innerHTML = '';
-            
+            linesElement.innerHTML = '';
+            intersectionsElement.innerHTML = '';
+
+            // 1. 선 그리기 (Lines)
             for (let i = 0; i < BOARD_SIZE; i++) {
-                for (let j = 0; j < BOARD_SIZE; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.addEventListener('click', handleMove);
-                    boardElement.appendChild(cell);
+                // 가로선 (Horizontal)
+                const hLine = document.createElement('div');
+                hLine.className = 'line-h';
+                hLine.style.top = `${i * CELL_SIZE}px`;
+                hLine.style.left = '15px';
+                hLine.style.right = '15px';
+                linesElement.appendChild(hLine);
+
+                // 세로선 (Vertical)
+                const vLine = document.createElement('div');
+                vLine.className = 'line-v';
+                vLine.style.left = `${i * CELL_SIZE}px`;
+                vLine.style.top = '15px';
+                vLine.style.bottom = '15px';
+                linesElement.appendChild(vLine);
+            }
+
+            // 2. 교차점(Intersection) 영역 추가 및 이벤트 리스너 설정
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const intersection = document.createElement('div');
+                    intersection.className = 'intersection';
+                    
+                    // 각 교차점의 정확한 위치 (패딩 15px + 인덱스 * 30px)
+                    intersection.style.top = `${r * CELL_SIZE + 15}px`;
+                    intersection.style.left = `${c * CELL_SIZE + 15}px`;
+
+                    intersection.dataset.row = r;
+                    intersection.dataset.col = c;
+                    intersection.addEventListener('click', handleMove);
+                    intersectionsElement.appendChild(intersection);
                 }
             }
             gameOver = false;
+            
+            // 중앙점 마커 (정확히는 3, 11, 11, 3 위치에 작은 점을 찍지만 여기선 생략)
         }
 
         modeButtons.forEach(button => {
@@ -121,40 +174,42 @@
         });
 
         difficultySelect.addEventListener('change', () => {
-            aiDepth = parseInt(difficultySelect.value);
-            // 난이도별 탐색 깊이 설정 (간단화)
-            // 하수: 1, 중수: 2, 고수: 3 (3 이상은 브라우저 부하 심함)
+            const difficulty = parseInt(difficultySelect.value);
+            // 난이도별 탐색 깊이 설정 (고수일수록 시간이 오래 걸림)
+            if (difficulty === 1) aiDepth = 1; // 하수
+            else if (difficulty === 2) aiDepth = 3; // 중수
+            else if (difficulty === 3) aiDepth = 5; // 고수 (경고: 5는 브라우저에서 느릴 수 있음)
         });
 
         function startGame() {
-            aiDepth = parseInt(difficultySelect.value);
-            currentPlayer = 1; // 항상 흑돌(1)부터 시작
+            const difficulty = parseInt(difficultySelect.value);
+            if (difficulty === 1) aiDepth = 1; 
+            else if (difficulty === 2) aiDepth = 3;
+            else if (difficulty === 3) aiDepth = 5;
+
+            currentPlayer = 1; // 흑돌부터 시작
             initializeBoard();
             statusElement.textContent = '흑돌 차례입니다.';
             
             if (currentMode === 'ai-ai') {
                 runAIGame();
-            } else if (currentMode === 'user-ai') {
-                // 사용자 vs AI 모드 (사용자 턴 대기)
-                // 만약 AI가 선공을 한다면 여기서 makeAIMove() 호출
             }
         }
 
         // -- 게임 흐름 제어 로직 --
 
         function handleMove(event) {
-            if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; // 사용자 턴이 아니면 무시
+            if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
 
-            const row = parseInt(event.target.dataset.row);
-            const col = parseInt(event.target.dataset.col);
+            const r = parseInt(event.target.dataset.row);
+            const c = parseInt(event.target.dataset.col);
 
-            if (board[row][col] === 0) {
-                placeStone(row, col, 1);
+            if (board[r][c] === 0) {
+                placeStone(r, c, 1);
                 
                 if (!gameOver) {
-                    // AI 턴으로 전환
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
-                    setTimeout(makeAIMove, 500); // 0.5초 딜레이 후 AI 실행
+                    setTimeout(makeAIMove, 500); 
                 }
             }
         }
@@ -177,19 +232,20 @@
         }
         
         function drawStoneOnUI(r, c, player) {
-            const index = r * BOARD_SIZE + c;
-            const cell = boardElement.children[index];
-            if (cell.children.length > 0) return;
-
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
-            cell.appendChild(stone);
+            
+            // 해당 교차점 요소를 찾아서 돌을 추가
+            const index = r * BOARD_SIZE + c;
+            const intersection = intersectionsElement.children[index];
+            if (intersection && intersection.children.length === 0) {
+                 intersection.appendChild(stone);
+            }
         }
 
         function runAIGame() {
             if (gameOver) return;
 
-            // AI vs AI 모드 실행
             if (currentPlayer === 1) {
                 statusElement.textContent = '흑돌 (AI)이 생각 중...';
             } else {
@@ -199,67 +255,71 @@
             setTimeout(() => {
                 makeAIMove(true);
                 if (!gameOver) {
-                    runAIGame(); // 다음 턴 재귀 호출
+                    runAIGame(); 
                 }
             }, 500);
         }
 
-        // -- AI 로직 --
+        // -- AI 로직 (Minimax 강화) --
 
         function makeAIMove(isAIVsAI = false) {
             if (gameOver) return;
 
-            const aiPlayer = currentPlayer; // 현재 턴 플레이어
+            const aiPlayer = currentPlayer; 
             const bestMove = findBestMove(aiPlayer, aiDepth);
 
             if (bestMove) {
                 placeStone(bestMove.r, bestMove.c, aiPlayer);
             }
             
-            // AI vs AI 모드일 때만 상태를 업데이트하고 다음 AI 턴을 위해 플레이어 전환
             if (isAIVsAI && !gameOver) {
                  const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌';
                  statusElement.textContent = `${nextPlayer} 차례입니다.`;
             }
         }
 
-        // Minimax 알고리즘 (간단화 및 성능 최적화)
         function findBestMove(player, depth) {
-            let bestScore = player === 1 ? -Infinity : Infinity;
+            let bestScore = -Infinity;
             let bestMove = null;
-            const maximizingPlayer = player === 1;
+            const possibleMoves = getPossibleMoves(board);
 
-            const possibleMoves = getPossibleMoves();
+            // 최적화: 중앙 근처 또는 방어 위치 먼저 탐색
+            possibleMoves.sort((a, b) => {
+                const centerR = Math.abs(a.r - 7);
+                const centerC = Math.abs(a.c - 7);
+                const distA = Math.max(centerR, centerC);
+                
+                const centerR2 = Math.abs(b.r - 7);
+                const centerC2 = Math.abs(b.c - 7);
+                const distB = Math.max(centerR2, centerC2);
+
+                return distA - distB; // 중앙에 가까울수록 먼저 탐색
+            });
 
             // Minimax 탐색
             for (const move of possibleMoves) {
                 const newBoard = simulateMove(board, move.r, move.c, player);
-                const score = minimax(newBoard, depth - 1, -Infinity, Infinity, !maximizingPlayer, player);
+                const score = minimax(newBoard, depth - 1, -Infinity, Infinity, false, player);
 
-                if (maximizingPlayer) {
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMove = move;
-                    }
-                } else {
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestMove = move;
-                    }
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
                 }
+                
+                // 고수 난이도에서는 첫 승리 수만 발견해도 바로 놓기 (속도 최적화)
+                if (player === 1 && score >= 100000000 && aiDepth >= 4) return bestMove;
             }
             return bestMove;
         }
 
-        // Minimax 재귀 함수
         function minimax(currentBoard, depth, alpha, beta, maximizingPlayer, originalPlayer) {
             const winner = checkBoardWin(currentBoard);
-            if (winner === originalPlayer) return 100000000 + depth; // 승리
-            if (winner !== 0) return -100000000 - depth; // 패배
-            if (depth === 0) return evaluateBoard(currentBoard, originalPlayer); // 깊이 도달
+            if (winner === originalPlayer) return 100000000 + depth; 
+            if (winner !== 0) return -100000000 - depth; 
+            if (depth === 0) return evaluateBoard(currentBoard, originalPlayer); 
 
             const nextPlayer = maximizingPlayer ? originalPlayer : (originalPlayer === 1 ? 2 : 1);
-            const possibleMoves = getPossibleMovesFromBoard(currentBoard);
+            const possibleMoves = getPossibleMoves(currentBoard);
 
             if (maximizingPlayer) {
                 let maxEval = -Infinity;
@@ -268,7 +328,7 @@
                     const eval = minimax(newBoard, depth - 1, alpha, beta, false, originalPlayer);
                     maxEval = Math.max(maxEval, eval);
                     alpha = Math.max(alpha, maxEval);
-                    if (beta <= alpha) break; // Alpha-Beta Pruning
+                    if (beta <= alpha) break; 
                 }
                 return maxEval;
             } else {
@@ -278,50 +338,25 @@
                     const eval = minimax(newBoard, depth - 1, alpha, beta, true, originalPlayer);
                     minEval = Math.min(minEval, eval);
                     beta = Math.min(beta, minEval);
-                    if (beta <= alpha) break; // Alpha-Beta Pruning
+                    if (beta <= alpha) break; 
                 }
                 return minEval;
             }
         }
 
-        // -- 보조 함수 --
 
-        // 현재 상태에서 놓을 수 있는 돌 주변 1칸 빈 공간 목록 반환 (탐색 최적화)
-        function getPossibleMoves() {
-            const moves = new Set();
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] !== 0) {
-                        for (let dr = -1; dr <= 1; dr++) {
-                            for (let dc = -1; dc <= 1; dc++) {
-                                if (dr === 0 && dc === 0) continue;
-                                const nr = r + dr;
-                                const nc = c + dc;
-                                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === 0) {
-                                    moves.add(`${nr},${nc}`);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            // 아직 돌이 하나도 없을 경우 중앙에 놓기
-            if (moves.size === 0) {
-                 moves.add(`${Math.floor(BOARD_SIZE/2)},${Math.floor(BOARD_SIZE/2)}`);
-            }
-            return Array.from(moves).map(move => {
-                const [r, c] = move.split(',').map(Number);
-                return {r, c};
-            });
-        }
+        // -- 보조 및 평가 함수 (AI 실력 강화의 핵심) --
         
-        function getPossibleMovesFromBoard(currentBoard) {
+        function getPossibleMoves(currentBoard) {
             const moves = new Set();
+            let stoneCount = 0;
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     if (currentBoard[r][c] !== 0) {
-                        for (let dr = -1; dr <= 1; dr++) {
-                            for (let dc = -1; dc <= 1; dc++) {
+                        stoneCount++;
+                        // 돌 주변 2칸까지 빈 공간만 탐색
+                        for (let dr = -2; dr <= 2; dr++) {
+                            for (let dc = -2; dc <= 2; dc++) {
                                 if (dr === 0 && dc === 0) continue;
                                 const nr = r + dr;
                                 const nc = c + dc;
@@ -333,12 +368,15 @@
                     }
                 }
             }
+            if (stoneCount === 0) { // 중앙 놓기
+                 moves.add(`${Math.floor(BOARD_SIZE/2)},${Math.floor(BOARD_SIZE/2)}`);
+            }
             return Array.from(moves).map(move => {
                 const [r, c] = move.split(',').map(Number);
                 return {r, c};
             });
         }
-
+        
         function simulateMove(currentBoard, r, c, player) {
             const newBoard = currentBoard.map(row => [...row]);
             newBoard[r][c] = player;
@@ -347,15 +385,11 @@
 
         // 승리 조건 확인 (UI용)
         function checkWin(r, c, player) {
-            // 8방향 벡터: 수평(0), 수직(1), 대각선(2, 3)
-            const directions = [
-                [0, 1], [1, 0], [1, 1], [1, -1] 
-            ];
-
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (const [dr, dc] of directions) {
                 let count = 1;
-                count += countLine(r, c, dr, dc, player);
-                count += countLine(r, c, -dr, -dc, player);
+                count += countLine(r, c, dr, dc, player, board);
+                count += countLine(r, c, -dr, -dc, player, board);
                 if (count >= 5) return true;
             }
             return false;
@@ -363,34 +397,36 @@
         
         // 승리 조건 확인 (AI 탐색용)
         function checkBoardWin(currentBoard) {
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     if (currentBoard[r][c] !== 0) {
                         const player = currentBoard[r][c];
-                        const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-                        
                         for (const [dr, dc] of directions) {
-                             // 5칸 연속 확인
+                             let count = 0;
                             for (let i = 0; i < 5; i++) {
                                 const nr = r + dr * i;
                                 const nc = c + dc * i;
-                                if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE || currentBoard[nr][nc] !== player) break;
-                                if (i === 4) return player; // 5목 달성
+                                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && currentBoard[nr][nc] === player) {
+                                    count++;
+                                } else {
+                                    break;
+                                }
                             }
+                            if (count === 5) return player; 
                         }
                     }
                 }
             }
-            return 0; // 승자 없음
+            return 0; 
         }
 
-        function countLine(r, c, dr, dc, player) {
+        function countLine(r, c, dr, dc, player, targetBoard) {
             let count = 0;
             for (let i = 1; i < 5; i++) {
                 const nr = r + dr * i;
                 const nc = c + dc * i;
-
-                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === player) {
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && targetBoard[nr][nc] === player) {
                     count++;
                 } else {
                     break;
@@ -399,72 +435,97 @@
             return count;
         }
 
-        // 보드 평가 함수 (AI 난이도의 핵심)
         function evaluateBoard(currentBoard, player) {
-            // 간단하게 4개, 3개, 2개 연속 돌의 개수를 세어 점수 부여
-            // 실제 Minimax 오목은 이 부분이 매우 복잡합니다. 여기서는 기능 구현을 위해 간단화
-            let score = 0;
             const opponent = player === 1 ? 2 : 1;
-            
-            // 승리/패배는 이미 minimax 상단에서 체크했으므로, 여기서는 유리함을 평가
-            score += evaluateLinePatterns(currentBoard, player) * 1;
-            score -= evaluateLinePatterns(currentBoard, opponent) * 1.5; // 상대방 공격을 더 중요하게 평가
-
-            return score;
+            // 플레이어 패턴 점수 - 상대방 패턴 점수 (상대방의 공격을 더 무겁게 막음)
+            return evaluatePatterns(currentBoard, player) - evaluatePatterns(currentBoard, opponent) * 1.5;
         }
         
-        // 5줄 패턴 평가
-        function evaluateLinePatterns(currentBoard, player) {
+        // 오목 패턴 평가 함수 (AI 실력 향상의 핵심)
+        function evaluatePatterns(currentBoard, player) {
             let score = 0;
-            const patterns = {
-                5: 1000000, // 5개 연속 (거의 승리)
-                4: 10000,   // 4개 연속
-                3: 100,     // 3개 연속
-                2: 10,      // 2개 연속
-            };
-
             const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-
+            
+            // 모든 교차점을 탐색
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (currentBoard[r][c] !== player) continue;
+                    
                     for (const [dr, dc] of directions) {
-                        for (let length = 2; length <= 4; length++) {
-                            let count = 0;
-                            let empty = 0;
-                            
-                            for (let i = 0; i < 5; i++) {
-                                const nr = r + dr * i;
-                                const nc = c + dc * i;
-
-                                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
-                                    if (currentBoard[nr][nc] === player) {
-                                        count++;
-                                    } else if (currentBoard[nr][nc] === 0) {
-                                        empty++;
-                                    } else {
-                                        // 상대 돌이 막고 있음
-                                        count = 0; 
-                                        break;
-                                    }
-                                } else {
-                                    // 보드 밖
-                                    count = 0;
-                                    break;
-                                }
-                            }
-
-                            if (count === length && empty > 0) {
-                                score += patterns[length];
-                            }
-                        }
+                        // 4연속, 3연속, 2연속 패턴 체크
+                        score += checkLineScore(currentBoard, r, c, dr, dc, player);
                     }
                 }
             }
             return score;
         }
 
+        // 특정 방향에서 패턴 점수를 계산
+        function checkLineScore(currentBoard, r, c, dr, dc, player) {
+            let score = 0;
+            const opponent = player === 1 ? 2 : 1;
+            
+            // 5칸짜리 윈도우를 sliding하면서 패턴을 확인합니다.
+            // i=0: 시작점, i=4: 끝점 (5칸 윈도우)
+            for (let i = 0; i < 5; i++) {
+                const startR = r - dr * i;
+                const startC = c - dc * i;
 
-        // 페이지 로드 시 게임 초기화
+                if (startR < 0 || startR > BOARD_SIZE - 5 || startC < 0 || startC > BOARD_SIZE - 5) continue;
+                
+                let myStones = 0;
+                let emptySpaces = 0;
+                let isBlocked = false;
+
+                // 윈도우 5칸을 확인
+                for (let j = 0; j < 5; j++) {
+                    const cr = startR + dr * j;
+                    const cc = startC + dc * j;
+
+                    if (currentBoard[cr][cc] === player) {
+                        myStones++;
+                    } else if (currentBoard[cr][cc] === opponent) {
+                        isBlocked = true;
+                        break;
+                    } else {
+                        emptySpaces++;
+                    }
+                }
+                
+                if (!isBlocked) {
+                    // 4개 연속 (한 쪽이 막히지 않은 4: 개방 4, 갇힌 4)
+                    if (myStones === 4 && emptySpaces === 1) {
+                         // 양쪽 끝이 모두 비어있다면: 매우 높은 점수 (필승)
+                         const block1 = (startR - dr < 0 || startR - dr >= BOARD_SIZE || startC - dc < 0 || startC - dc >= BOARD_SIZE || currentBoard[startR - dr][startC - dc] === opponent);
+                         const block2 = (startR + dr * 5 < 0 || startR + dr * 5 >= BOARD_SIZE || startC + dc * 5 < 0 || startC + dc * 5 >= BOARD_SIZE || currentBoard[startR + dr * 5][startC + dc * 5] === opponent);
+
+                        if (!block1 && !block2) { // 양쪽 오픈 4
+                             score += 100000;
+                        } else { // 한쪽 오픈 4 (막아야 하는 상황)
+                             score += 50000;
+                        }
+                    } 
+                    // 3개 연속
+                    else if (myStones === 3 && emptySpaces === 2) {
+                         // 양쪽 오픈 3 (매우 위험한 삼삼)
+                        const block1 = (startR - dr < 0 || startR - dr >= BOARD_SIZE || startC - dc < 0 || startC - dc >= BOARD_SIZE || currentBoard[startR - dr][startC - dc] === opponent);
+                        const block2 = (startR + dr * 5 < 0 || startR + dr * 5 >= BOARD_SIZE || startC + dc * 5 < 0 || startC + dc * 5 >= BOARD_SIZE || currentBoard[startR + dr * 5][startC + dc * 5] === opponent);
+
+                        if (!block1 && !block2) { 
+                             score += 1000;
+                        } else {
+                             score += 100;
+                        }
+                    }
+                    // 2개 연속
+                    else if (myStones === 2 && emptySpaces === 3) {
+                        score += 10;
+                    }
+                }
+            }
+            return score;
+        }
+
         window.onload = startGame;
     </script>
 </body>
