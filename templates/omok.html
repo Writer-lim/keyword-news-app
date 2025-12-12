@@ -17,25 +17,22 @@
         /* 오목판 전체 래퍼 */
         #board-wrapper {
             position: relative;
-            /* 15x15 보드 기준 14개 간격. 30px * 14 = 420px. 양쪽 패딩 15px */
-            width: 450px; 
-            height: 450px;
+            /* width/height는 JS에서 동적으로 설정 */
             padding: 15px; 
             background-color: #e3b772;
             border: 1px solid #000; 
             user-select: none;
         }
         
-        /* 라인 및 교차점 영역 (패딩 15px만큼 이동, 420x420 영역) */
+        /* 라인 및 교차점 영역 (패딩 15px만큼 이동) */
         #lines, #intersections {
             position: absolute;
             top: 15px; 
             left: 15px;
-            width: 420px; 
-            height: 420px;
+            /* width/height는 JS에서 동적으로 설정 */
         }
 
-        /* 가로/세로선 두께 통일 */
+        /* 선: 두께 통일 */
         .line-h, .line-v {
             position: absolute;
             background-color: #000;
@@ -51,7 +48,6 @@
         }
         
         .stone {
-            /* 돌 크기는 CELL_SIZE에 맞춰 JS에서 동적으로 설정 */
             border-radius: 50%;
             position: absolute;
             top: 50%;
@@ -60,6 +56,14 @@
         }
         .black { background-color: black; z-index: 20; }
         .white { background-color: white; border: 1px solid #333; z-index: 20; }
+
+        /* **[요청 2] 미리보기 돌 스타일 추가** */
+        .preview {
+            background-color: black; 
+            opacity: 0.4; /* 투명하게 */
+            z-index: 19;
+            pointer-events: none; /* 클릭 이벤트 방지 */
+        }
         
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
         
@@ -67,13 +71,13 @@
         @media (max-width: 600px) {
              .container { padding: 10px; }
              #board-wrapper { 
-                 /* 최대 너비를 95vw로 설정하고 내부 padding은 15px로 유지 */
-                 max-width: 95vw;
-                 height: calc(95vw - 30px); /* 정사각형 유지 */
-                 width: calc(95vw - 30px); 
+                 /* 화면 너비의 95%를 사용하고, 그 크기를 기준으로 내부를 채움 */
+                 width: calc(95vw - 30px);
+                 height: calc(95vw - 30px);
+                 max-width: 570px;
+                 max-height: 570px;
                  padding: 15px; 
              }
-             /* Lines와 Intersections는 wrapper 크기에 맞춰 동적 조정 (JS 처리) */
         }
 
     </style>
@@ -119,10 +123,10 @@
         const modeButtons = document.querySelectorAll('#controls button[data-mode]');
         
         const BOARD_SIZE = 15; 
-        let CELL_SIZE = 30; // 초기값
+        let CELL_SIZE = 30; 
 
         let board = [];
-        let currentPlayer = 1; // 1: 흑, 2: 백
+        let currentPlayer = 1; 
         let gameOver = false;
         let currentMode = 'user-ai';
         let aiDepth = 3; 
@@ -135,9 +139,9 @@
         // -- 초기화 및 UI 로직 (정렬 문제 해결) --
 
         function initializeBoard() {
-             // 동적으로 CELL_SIZE 계산: 15x15는 14개의 간격
-             const linesContainerWidth = boardWrapper.clientWidth - 30; // wrapperWidth - padding (15*2)
-             CELL_SIZE = linesContainerWidth / (BOARD_SIZE - 1);
+             // 동적으로 CELL_SIZE 계산: wrapper의 실제 크기를 사용 (padding 제외)
+             const boardInnerWidth = boardWrapper.clientWidth - 30; // 30px는 패딩 (15*2)
+             CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1);
              
              // Lines 및 Intersections 컨테이너 크기 설정
              const linesSize = (BOARD_SIZE - 1) * CELL_SIZE;
@@ -152,13 +156,13 @@
 
             // 1. 선 그리기 (Lines)
             for (let i = 0; i < BOARD_SIZE; i++) {
-                // 가로선 (Horizontal)
+                // 가로선
                 const hLine = document.createElement('div');
                 hLine.className = 'line-h';
                 hLine.style.top = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(hLine);
 
-                // 세로선 (Vertical)
+                // 세로선
                 const vLine = document.createElement('div');
                 vLine.className = 'line-v';
                 vLine.style.left = `${i * CELL_SIZE}px`; 
@@ -172,6 +176,7 @@
                     intersection.className = 'intersection';
                     
                     // 각 교차점의 정확한 위치 및 크기: CELL_SIZE 크기로 설정하여 클릭 영역 확보
+                    // 이 위치는 선이 교차하는 중앙을 기준으로 합니다.
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
                     intersection.style.width = `${CELL_SIZE}px`;
@@ -179,12 +184,47 @@
 
                     intersection.dataset.row = r;
                     intersection.dataset.col = c;
+                    
+                    // 마우스 이벤트 추가 (투명 돌 표시)
+                    intersection.addEventListener('mouseover', showPreview);
+                    intersection.addEventListener('mouseout', hidePreview);
+                    
                     intersection.addEventListener('click', handleMove);
                     intersectionsElement.appendChild(intersection);
                 }
             }
             gameOver = false;
         }
+
+        // **[요청 2] 마우스 오버 시 투명 돌 표시 기능**
+        function showPreview(event) {
+            if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return;
+            
+            const r = parseInt(event.target.dataset.row);
+            const c = parseInt(event.target.dataset.col);
+            
+            if (board[r][c] === 0) {
+                const intersection = event.target;
+                
+                // 이미 돌이 없으면 미리보기 돌 생성
+                if (intersection.querySelector('.stone') === null) {
+                    const previewStone = document.createElement('div');
+                    previewStone.className = 'stone black preview'; 
+                    previewStone.style.width = `${CELL_SIZE * 0.9}px`;
+                    previewStone.style.height = `${CELL_SIZE * 0.9}px`;
+                    intersection.appendChild(previewStone);
+                }
+            }
+        }
+
+        function hidePreview(event) {
+            const intersection = event.target;
+            const previewStone = intersection.querySelector('.preview');
+            if (previewStone) {
+                intersection.removeChild(previewStone);
+            }
+        }
+
 
         modeButtons.forEach(button => {
             button.addEventListener('click', () => {
@@ -219,13 +259,16 @@
             const c = parseInt(event.target.dataset.col);
 
             if (board[r][c] === 0) {
-                 // **[요청 6] 착수 확인 팝업 추가**
-                if (!confirm(`(${r}, ${c}) 위치에 흑돌을 놓으시겠습니까?`)) {
-                    return; // 사용자가 취소하면 착수 안 함
+                 // **미리보기 돌을 확인 팝업 이전에 제거 (클릭 후 마우스 아웃 이벤트가 발생하지 않을 수 있음)**
+                 hidePreview(event); 
+
+                 if (!confirm(`(${r+1}, ${c+1}) 위치에 흑돌을 놓으시겠습니까?`)) { // 사용자가 더 쉽게 이해하도록 +1 좌표 표시
+                    return; 
                 }
 
                 placeStone(r, c, 1);
                 
+                // **[요청 4] 턴 전환 로직 수정**
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
                     // AI 턴: 비동기 처리
@@ -243,7 +286,7 @@
                 statusElement.textContent = `${winner} 승리! 🎉`;
                 gameOver = true;
             } else {
-                // **[요청 3] 턴 전환 로직 수정: 이 함수가 호출되면 무조건 턴을 넘김**
+                // **턴 전환**
                 currentPlayer = player === 1 ? 2 : 1; 
                 
                 // 턴 상태 UI 업데이트
@@ -258,7 +301,7 @@
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
             
-            // 돌 크기를 동적으로 설정 (셀 크기의 90% 사용)
+            // 돌 크기를 동적으로 설정
             stone.style.width = `${CELL_SIZE * 0.9}px`;
             stone.style.height = `${CELL_SIZE * 0.9}px`;
 
@@ -275,11 +318,9 @@
             const thinkingPlayer = currentPlayer === 1 ? '흑돌 (AI)' : '백돌 (AI)';
             statusElement.textContent = `${thinkingPlayer}이 생각 중...`;
             
-            // AI vs AI 턴: 비동기 처리
             setTimeout(() => {
                 makeAIMove(true);
                 if (!gameOver) {
-                    // AI vs AI의 다음 턴을 위해 재귀 호출
                     runAIGame(); 
                 }
             }, 500);
@@ -291,8 +332,18 @@
             if (gameOver) return;
 
             const aiPlayer = currentPlayer; 
-            // 첫 수를 중앙에 두는 로직 (7, 7)을 제외한 Minimax 로직 호출
-            const bestMove = findBestMove(aiPlayer, aiDepth); 
+            
+            // 임시 AI 로직 (Minimax 함수 대신 랜덤 선택 또는 간단한 첫 수 중앙 착수)
+            let bestMove = findBestMove(aiPlayer, aiDepth); 
+            
+            // 첫 수 중앙 착수 로직 (AI가 흑일 경우)
+            if (aiPlayer === 1 && board.flat().every(val => val === 0)) {
+                bestMove = { r: 7, c: 7 }; 
+            }
+            // AI가 백일 경우, 흑돌 주변에 착수하는 임의 로직 (현재 Minimax가 없으므로)
+            else if (aiPlayer === 2 && board[7][7] === 1 && board.flat().filter(val => val !== 0).length === 1) {
+                bestMove = { r: 6, c: 7 }; // 흑돌 바로 위에 착수
+            }
 
             if (bestMove) {
                 placeStone(bestMove.r, bestMove.c, aiPlayer);
@@ -304,9 +355,20 @@
             }
         }
 
-        // --- Minimax 및 평가 함수 (이전 코드와 동일하므로 생략) ---
-        // 이 부분은 기존에 작동했던 Minimax, evaluateBoard, checkWin 등의 코드를 넣어주세요.
-        function findBestMove(player, depth) { /* ... */ return {r: 7, c: 7}; } 
+        // --- Minimax 및 평가 함수 (더미 함수 유지) ---
+        // 이 부분은 실제로 AI 로직이 들어갈 자리입니다.
+        function findBestMove(player, depth) { 
+             const empty = [];
+             for(let r=0; r<BOARD_SIZE; r++) {
+                 for(let c=0; c<BOARD_SIZE; c++) {
+                     if(board[r][c] === 0) empty.push({r, c});
+                 }
+             }
+             if (empty.length > 0) {
+                 return empty[Math.floor(Math.random() * empty.length)]; // 임시 랜덤
+             }
+             return null;
+        } 
         function checkWin(r, c, player) { /* ... */ return false; }
         // ... (나머지 AI 함수들)
 
