@@ -2,56 +2,107 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Minigames Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>원하는 서비스 선택</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { text-align: center; max-width: 800px; padding: 20px; }
-        h1 { color: #333; margin-bottom: 40px; }
-        .card-container { display: flex; gap: 40px; justify-content: center; }
-        .card {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            width: 300px;
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
-            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 50px;
+            font-size: 2em;
+        }
+
+        .card-container {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            flex-wrap: wrap; /* 모바일에서 자동으로 줄 바꿈 */
+        }
+
+        .card {
+            display: block;
             text-decoration: none;
             color: #333;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 300px;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
+
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
-        .card h2 { margin-top: 10px; color: #007bff; }
-        .icon { font-size: 48px; margin-bottom: 10px; }
-        .news-icon { color: #dc3545; }
-        .omok-icon { color: #28a745; }
+
+        .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+            color: #2c3e50;
+        }
+
+        p {
+            color: #7f8c8d;
+            font-size: 0.95em;
+        }
+        
+        /* 모바일 가독성 개선 CSS */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+                margin-bottom: 30px;
+            }
+            .card-container {
+                flex-direction: column; /* 카드를 세로로 배치 */
+                gap: 20px;
+                align-items: center;
+            }
+            .card {
+                width: 90%; /* 모바일 화면 너비의 90% 사용 */
+                max-width: 400px;
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>원하는 서비스를 선택하세요</h1>
-        <div class="card-container">
-           <div class="card-container">
-            <a href="/news" class="card">
-                <div class="icon news-icon">📰</div>
-                <h2>뉴스 검색기</h2>
-                <p>최신 키워드 뉴스를 실시간으로 검색합니다.</p>
-            </a>
-            
-            <a href="/omok" class="card">
-                <div class="icon omok-icon">⚫🔴</div>
-                <h2>오목 AI 대전</h2>
-                <p>다양한 난이도의 AI와 오목 대결을 펼칩니다.</p>
-            </a>
-            
-            <a href="/baduk" class="card">
-                <div class="icon baduk-icon" style="color: #6c757d;">⚪⚫</div>
-                <h2>바둑 게임</h2>
-                <p>19줄 바둑판에서 기본적인 규칙으로 플레이합니다.</p>
-            </a>
-                </div>
+    <h1>원하는 서비스를 선택하세요</h1>
+    
+    <div class="card-container">
+        <a href="/news" class="card">
+            <div class="icon news-icon">📰</div>
+            <h2>뉴스 검색기</h2>
+            <p>최신 키워드 뉴스를 실시간으로 검색합니다.</p>
+        </a>
+        
+        <a href="/omok" class="card">
+            <div class="icon omok-icon">⚫🔴</div>
+            <h2>오목 AI 대전</h2>
+            <p>다양한 난이도의 AI와 오목 대결을 펼칩니다.</p>
+        </a>
+        
+        <a href="/baduk" class="card">
+            <div class="icon baduk-icon" style="color: #6c757d;">⚪⚫</div>
+            <h2>바둑 게임</h2>
+            <p>19줄 바둑판에서 기본적인 규칙으로 플레이합니다.</p>
+        </a>
     </div>
+
 </body>
 </html>

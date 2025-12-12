@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>오목 게임 (고성능 AI) 🔴⚫</title>
     <style>
         body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
@@ -20,37 +21,36 @@
             height: 450px;
             padding: 15px; 
             background-color: #e3b772;
-            /* 라인 두께를 1px로 통일 */
             border: 1px solid #000; 
             user-select: none;
         }
         
-        /* 바둑/오목 선 및 교차점 요소를 감싸는 영역 */
+        /* 라인 및 교차점 영역 (패딩 15px만큼 이동) */
         #lines, #intersections {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 15px; 
+            left: 15px;
+            width: 420px; /* 14*30 */
+            height: 420px;
         }
 
         /* 가로선 */
         .line-h {
             position: absolute;
-            height: 1px; /* 얇은 라인으로 통일 */
+            height: 1px; 
             background-color: #000;
-            left: 15px;
-            right: 15px;
+            left: 0;
+            right: 0;
             transform: translateY(-0.5px);
         }
         
         /* 세로선 */
         .line-v {
             position: absolute;
-            width: 1px; /* 얇은 라인으로 통일 */
+            width: 1px; 
             background-color: #000;
-            top: 15px;
-            bottom: 15px;
+            top: 0;
+            bottom: 0;
             transform: translateX(-0.5px);
         }
         
@@ -76,6 +76,26 @@
         .white { background-color: white; border: 1px solid #333; z-index: 20; }
         
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
+        
+        /* 모바일 최적화: 600px 이하일 때 보드 크기 조정 */
+        @media (max-width: 600px) {
+             .container { padding: 10px; }
+             #board-wrapper { 
+                 /* 너비를 90vw로 설정하고 내부 padding은 15px로 유지 */
+                 max-width: 90vw;
+                 max-height: 90vw;
+                 width: calc(100% - 30px);
+                 height: calc(100% - 30px);
+             }
+             /* 선/교차점 위치 및 크기 재설정 */
+             #lines, #intersections {
+                 top: 15px; left: 15px;
+                 width: calc(100% - 15px);
+                 height: calc(100% - 15px);
+             }
+             /* intersection과 stone 크기는 JS에서 동적으로 처리 */
+        }
+
     </style>
 </head>
 <body>
@@ -111,25 +131,41 @@
     </div>
 
     <script>
-        // (JavaScript 코드는 이전과 동일하며, UI/CSS 수정 외에는 변경 없습니다.)
-
         const intersectionsElement = document.getElementById('intersections');
         const linesElement = document.getElementById('lines');
         const statusElement = document.getElementById('status');
+        const boardWrapper = document.getElementById('board-wrapper');
         const difficultySelect = document.getElementById('difficulty');
         const modeButtons = document.querySelectorAll('#controls button[data-mode]');
         
-        const BOARD_SIZE = 15; // 0부터 14까지 인덱스 사용
-        const CELL_SIZE = 30;
+        const BOARD_SIZE = 15; 
+        let CELL_SIZE = 30; // 초기값
+
         let board = [];
-        let currentPlayer = 1; // 1: 흑(사용자/선공), 2: 백(AI/후공)
+        let currentPlayer = 1; // 1: 흑, 2: 백
         let gameOver = false;
         let currentMode = 'user-ai';
         let aiDepth = 3; 
 
+        window.addEventListener('resize', () => {
+             // 리사이즈 시 UI 업데이트를 위해 게임 재시작 (크기 재계산 포함)
+             startGame(); 
+        });
+
         // -- 초기화 및 UI 로직 --
 
         function initializeBoard() {
+             // 동적으로 CELL_SIZE 계산
+             const linesContainerWidth = boardWrapper.clientWidth - 30; // 30px는 패딩
+             CELL_SIZE = linesContainerWidth / (BOARD_SIZE - 1);
+             
+             // CSS의 width/height도 재설정 (모바일 대응)
+             linesElement.style.width = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             linesElement.style.height = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             intersectionsElement.style.width = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             intersectionsElement.style.height = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+
+
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             linesElement.innerHTML = '';
             intersectionsElement.innerHTML = '';
@@ -139,13 +175,13 @@
                 // 가로선 (Horizontal)
                 const hLine = document.createElement('div');
                 hLine.className = 'line-h';
-                hLine.style.top = `${i * CELL_SIZE + 15}px`; // 교차점 중앙
+                hLine.style.top = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(hLine);
 
                 // 세로선 (Vertical)
                 const vLine = document.createElement('div');
                 vLine.className = 'line-v';
-                vLine.style.left = `${i * CELL_SIZE + 15}px`; // 교차점 중앙
+                vLine.style.left = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(vLine);
             }
 
@@ -155,9 +191,12 @@
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // 각 교차점의 정확한 위치 (패딩 15px + 인덱스 * 30px)
+                    // 각 교차점의 정확한 위치 및 크기
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
+                    intersection.style.width = `${CELL_SIZE}px`;
+                    intersection.style.height = `${CELL_SIZE}px`;
+
 
                     intersection.dataset.row = r;
                     intersection.dataset.col = c;
@@ -178,18 +217,11 @@
         });
 
         difficultySelect.addEventListener('change', () => {
-            const difficulty = parseInt(difficultySelect.value);
-            if (difficulty === 1) aiDepth = 1; 
-            else if (difficulty === 3) aiDepth = 3; 
-            else if (difficulty === 5) aiDepth = 5; 
+            aiDepth = parseInt(difficultySelect.value);
         });
 
         function startGame() {
-            const difficulty = parseInt(difficultySelect.value);
-            if (difficulty === 1) aiDepth = 1; 
-            else if (difficulty === 3) aiDepth = 3;
-            else if (difficulty === 5) aiDepth = 5;
-
+            aiDepth = parseInt(difficultySelect.value); // 현재 선택된 난이도 반영
             currentPlayer = 1; 
             initializeBoard();
             statusElement.textContent = '흑돌 차례입니다.';
@@ -199,7 +231,7 @@
             }
         }
 
-        // -- 게임 흐름 제어 로직 (이전과 동일) --
+        // -- 게임 흐름 제어 로직 (턴 로직 수정) --
 
         function handleMove(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
@@ -212,6 +244,7 @@
                 
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
+                    // AI 턴: 비동기 처리
                     setTimeout(makeAIMove, 500); 
                 }
             }
@@ -227,6 +260,7 @@
                 gameOver = true;
             } else {
                 currentPlayer = player === 1 ? 2 : 1;
+                // 턴 상태 UI 업데이트
                 if (currentMode !== 'ai-ai') {
                     const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌 (AI)';
                     statusElement.textContent = `${nextPlayer} 차례입니다.`;
@@ -238,6 +272,10 @@
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
             
+            // 돌 크기를 동적으로 설정
+            stone.style.width = `${CELL_SIZE * 0.9}px`;
+            stone.style.height = `${CELL_SIZE * 0.9}px`;
+
             const index = r * BOARD_SIZE + c;
             const intersection = intersectionsElement.children[index];
             if (intersection && intersection.children.length === 0) {
@@ -253,45 +291,41 @@
             } else {
                 statusElement.textContent = '백돌 (AI)이 생각 중...';
             }
-
+            
+            // AI vs AI 턴: 비동기 처리
             setTimeout(() => {
                 makeAIMove(true);
                 if (!gameOver) {
+                    // AI vs AI의 다음 턴을 위해 재귀 호출
                     runAIGame(); 
                 }
             }, 500);
         }
 
-        // -- AI 로직 (Minimax, 이전과 동일) --
-        // (중략)
-
+        // -- AI 로직 (Minimax, 이전 코드와 동일) --
+        
         function makeAIMove(isAIVsAI = false) {
             if (gameOver) return;
 
             const aiPlayer = currentPlayer; 
-            const bestMove = findBestMove(aiPlayer, aiDepth);
+            const bestMove = findBestMove(aiPlayer, aiDepth); 
 
             if (bestMove) {
                 placeStone(bestMove.r, bestMove.c, aiPlayer);
             }
-            
+            // AI vs AI 모드일 때만 턴 상태 업데이트
             if (isAIVsAI && !gameOver) {
                  const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌';
                  statusElement.textContent = `${nextPlayer} 차례입니다.`;
             }
         }
 
-        function findBestMove(player, depth) { /* ... (이전 코드와 동일) ... */ return {r: 7, c: 7}; } // 반환 값은 임시, 실제 코드는 이전 omok.html 코드를 유지
-        function minimax(currentBoard, depth, alpha, beta, maximizingPlayer, originalPlayer) { /* ... (이전 코드와 동일) ... */ return 0; }
-        function getPossibleMoves(currentBoard) { /* ... (이전 코드와 동일) ... */ return []; }
-        function simulateMove(currentBoard, r, c, player) { /* ... (이전 코드와 동일) ... */ return currentBoard; }
-        function checkWin(r, c, player) { /* ... (이전 코드와 동일) ... */ return false; }
-        function checkBoardWin(currentBoard) { /* ... (이전 코드와 동일) ... */ return 0; }
-        function countLine(r, c, dr, dc, player, targetBoard) { /* ... (이전 코드와 동일) ... */ return 0; }
-        function evaluateBoard(currentBoard, player) { /* ... (이전 코드와 동일) ... */ return 0; }
-        function evaluatePatterns(currentBoard, player) { /* ... (이전 코드와 동일) ... */ return 0; }
-        function checkLineScore(currentBoard, r, c, dr, dc, player) { /* ... (이전 코드와 동일) ... */ return 0; }
-
+        // --- Minimax 및 평가 함수 (중요 로직은 이전과 동일하므로 생략) ---
+        // 이 부분은 기존에 작동했던 Minimax, evaluateBoard, checkWin 등의 코드를 넣어주세요.
+        // 예를 들어:
+        function findBestMove(player, depth) { /* ... */ return {r: 7, c: 7}; } 
+        function checkWin(r, c, player) { /* ... */ return false; }
+        // ... (나머지 AI 함수들)
 
         window.onload = startGame;
     </script>

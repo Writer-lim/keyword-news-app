@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>바둑 게임 (19x19)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>바둑 게임 (19x19) ⚫⚪</title>
     <style>
         body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
         .container { max-width: 800px; margin: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
@@ -13,34 +14,35 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
 
-        /* 바둑판 전체 래퍼: 19*30 = 570px */
+        /* 바둑판 전체 래퍼: 19x19 보드 */
         #board-wrapper {
             position: relative;
-            width: 540px; /* 18 * 30px */
+            width: 540px; 
             height: 540px;
             padding: 15px; 
             background-color: #e3b772;
-            border: 1px solid #000; /* 바깥 라인 1px로 통일 */
+            border: 1px solid #000; 
             user-select: none;
         }
         
+        /* 라인 및 교차점 영역 (패딩 15px만큼 이동) */
         #lines, #intersections {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 15px; 
+            left: 15px;
+            width: 540px; 
+            height: 540px;
         }
         
-        /* 선 */
+        /* 선: 라인 누락 문제 해결 */
         .line-h, .line-v {
             position: absolute;
             background-color: #000;
         }
-        /* 가로선: 양쪽 패딩 15px 반영 */
-        .line-h { height: 1px; left: 15px; right: 15px; transform: translateY(-0.5px); }
-        /* 세로선: 상하 패딩 15px 반영 */
-        .line-v { width: 1px; top: 15px; bottom: 15px; transform: translateX(-0.5px); }
+        /* 가로선 */
+        .line-h { height: 1px; left: 0; right: 0; transform: translateY(-0.5px); }
+        /* 세로선 */
+        .line-v { width: 1px; top: 0; bottom: 0; transform: translateX(-0.5px); }
         
         .intersection {
             width: 30px;
@@ -63,6 +65,23 @@
         .white { background-color: white; border: 1px solid #333; z-index: 20; }
         
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
+
+        /* 모바일 최적화: 600px 이하일 때 보드 크기 조정 */
+        @media (max-width: 600px) {
+             .container { padding: 10px; }
+             #board-wrapper { 
+                 width: calc(100% - 30px);
+                 height: calc(100vw - 30px);
+                 padding: 15px;
+                 max-width: 95vw;
+             }
+             #lines, #intersections {
+                 top: 15px; left: 15px;
+                 width: calc(100% - 30px);
+                 height: calc(100% - 30px);
+             }
+             /* intersection과 stone 크기는 JS에서 동적으로 처리 */
+        }
     </style>
 </head>
 <body>
@@ -86,6 +105,7 @@
                     <option value="1">고수 (랜덤)</option>
                 </select>
                 <button onclick="startGame()">새 게임 시작</button>
+                <button onclick="passTurn()">패스</button>
             </div>
         </div>
 
@@ -101,46 +121,63 @@
         const intersectionsElement = document.getElementById('intersections');
         const linesElement = document.getElementById('lines');
         const statusElement = document.getElementById('status');
+        const boardWrapper = document.getElementById('board-wrapper');
         const modeButtons = document.querySelectorAll('#controls button[data-mode]');
         
         const BOARD_SIZE = 19; 
-        const CELL_SIZE = 30;
+        let CELL_SIZE = 30; // 초기값
+
         let board = [];
-        let currentPlayer = 1; // 1: 흑, 2: 백
+        let currentPlayer = 1; 
         let gameOver = false;
         let currentMode = 'user-ai';
 
+        window.addEventListener('resize', initializeBoard); 
+        
         // -- 초기화 및 UI 로직 --
 
         function initializeBoard() {
+             // 동적으로 CELL_SIZE 계산
+             const linesContainerWidth = boardWrapper.clientWidth - 30; // 30px는 패딩
+             CELL_SIZE = linesContainerWidth / (BOARD_SIZE - 1);
+            
+             // CSS의 width/height도 재설정 (모바일 대응)
+             linesElement.style.width = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             linesElement.style.height = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             intersectionsElement.style.width = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+             intersectionsElement.style.height = `${(BOARD_SIZE - 1) * CELL_SIZE}px`;
+
+
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             linesElement.innerHTML = '';
             intersectionsElement.innerHTML = '';
 
-            // 1. 선 그리기 (Lines) - 19x19
+            // 1. 선 그리기 (Lines)
             for (let i = 0; i < BOARD_SIZE; i++) {
                 // 가로선
                 const hLine = document.createElement('div');
                 hLine.className = 'line-h';
-                hLine.style.top = `${i * CELL_SIZE + 15}px`; 
+                hLine.style.top = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(hLine);
 
                 // 세로선
                 const vLine = document.createElement('div');
                 vLine.className = 'line-v';
-                vLine.style.left = `${i * CELL_SIZE + 15}px`; 
+                vLine.style.left = `${i * CELL_SIZE}px`; 
                 linesElement.appendChild(vLine);
             }
 
-            // 2. 교차점(Intersection) 영역 추가 및 이벤트 리스너 설정
+            // 2. 교차점 영역 추가 및 이벤트 리스너 설정
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // 각 교차점의 정확한 위치: 15px(패딩) + 인덱스 * 30px
+                    // 위치와 크기를 동적으로 설정
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
+                    intersection.style.width = `${CELL_SIZE}px`;
+                    intersection.style.height = `${CELL_SIZE}px`;
 
                     intersection.dataset.row = r;
                     intersection.dataset.col = c;
@@ -171,8 +208,8 @@
             }
         }
 
-        // -- 게임 흐름 및 규칙 로직 --
-
+        // -- 게임 흐름 및 규칙 로직 (자살 수 검사 개선) --
+        
         function handleMove(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
 
@@ -180,7 +217,6 @@
             const c = parseInt(event.target.dataset.col);
 
             if (board[r][c] === 0) {
-                // 1. 착수 시도 및 규칙 검사 (자살, 따냄)
                 if (tryMove(r, c, 1)) {
                     // AI 턴으로 전환
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
@@ -189,33 +225,44 @@
             }
         }
         
-        function tryMove(r, c, player) {
-            // 임시 착수
-            board[r][c] = player;
+        function tryMove(r, c, player, isAI = false) {
+            // 1. 임시 착수 및 보드 복사
+            const tempBoard = board.map(row => [...row]);
+            tempBoard[r][c] = player;
             
-            // 1. 따낸 돌 확인
-            const stonesToRemove = checkCaptures(r, c, player);
+            // 2. 따낸 돌 확인 (tempBoard 기준)
+            const stonesToRemove = checkCaptures(r, c, player, tempBoard);
 
             if (stonesToRemove.length > 0) {
-                // 따낸 돌이 있으면 제거하고 착수 완료
-                removeStones(stonesToRemove);
-                finalizeMove(r, c, player);
+                // 따낸 돌이 있으면, tempBoard에서 제거
+                stonesToRemove.forEach(([tr, tc]) => tempBoard[tr][tc] = 0);
+                
+                // 최종 보드 업데이트 및 착수 완료
+                board = tempBoard;
+                finalizeMove(r, c, player, stonesToRemove);
                 return true;
-            } else if (!hasLiberty(r, c)) {
-                // 따낸 돌이 없는데 착수한 돌 그룹이 숨이 없으면 자살 금지
-                board[r][c] = 0; // 착수 취소
-                if (currentMode !== 'ai-ai') alert("자살 금지 (따내는 돌이 없는데 놓으면 안 됩니다)!");
-                return false;
+
             } else {
-                // 정상 착수
-                finalizeMove(r, c, player);
-                return true;
+                 // 3. 따낸 돌이 없으면 자살 수 검사
+                 if (!hasLiberty(r, c, tempBoard)) {
+                    // 자살 수!
+                    if (!isAI) alert("자살 금지 (따내는 돌이 없는데 놓으면 안 됩니다)!");
+                    return false;
+                 } else {
+                    // 자살 수가 아니면 정상 착수
+                    board = tempBoard;
+                    finalizeMove(r, c, player, []);
+                    return true;
+                 }
             }
         }
         
-        function finalizeMove(r, c, player) {
+        function finalizeMove(r, c, player, stonesRemoved) {
             drawStoneOnUI(r, c, player);
+            removeStones(stonesRemoved); // 따낸 돌 UI에서 제거
+            
             currentPlayer = player === 1 ? 2 : 1;
+            
             if (currentMode !== 'ai-ai') {
                  statusElement.textContent = `${currentPlayer === 1 ? '흑돌' : '백돌 (AI)'} 차례입니다.`;
             }
@@ -227,19 +274,35 @@
             if (intersection && intersection.children.length === 0) {
                 const stone = document.createElement('div');
                 stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
+                
+                // 돌 크기를 동적으로 설정
+                stone.style.width = `${CELL_SIZE * 0.9}px`;
+                stone.style.height = `${CELL_SIZE * 0.9}px`;
+
                 intersection.appendChild(stone);
             }
         }
         
         function removeStones(stonesToRemove) {
             stonesToRemove.forEach(([r, c]) => {
-                board[r][c] = 0;
                 const index = r * BOARD_SIZE + c;
                 const intersection = intersectionsElement.children[index];
-                if (intersection.children.length > 0) {
+                if (intersection && intersection.children.length > 0) {
                     intersection.removeChild(intersection.firstChild);
                 }
             });
+        }
+        
+        function passTurn() {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            statusElement.textContent = `${currentPlayer === 1 ? '흑돌' : '백돌'} 차례입니다. (패스됨)`;
+            
+            if (currentMode === 'ai-ai' && !gameOver) {
+                runAIGame();
+            } else if (currentMode === 'user-ai' && currentPlayer === 2 && !gameOver) {
+                statusElement.textContent = '백돌 (AI)이 생각 중...';
+                setTimeout(makeAIMove, 500);
+            }
         }
         
         function runAIGame() {
@@ -259,7 +322,7 @@
             }, 500);
         }
 
-        // -- 바둑 AI 로직 (임시 랜덤) --
+        // -- 바둑 AI 로직 (랜덤) --
 
         function makeAIMove(isAIVsAI = false) {
             if (gameOver) return;
@@ -274,19 +337,17 @@
                 }
             }
             
-            // 랜덤 착수 시도 (규칙 위반 시 실패)
             let successfulMove = false;
             while (emptyMoves.length > 0 && !successfulMove) {
                 const index = Math.floor(Math.random() * emptyMoves.length);
                 const {r, c} = emptyMoves.splice(index, 1)[0];
                 
-                if (tryMove(r, c, aiPlayer)) {
+                if (tryMove(r, c, aiPlayer, true)) { // isAI=true로 전달
                     successfulMove = true;
                 }
             }
 
             if (!successfulMove) {
-                 // 모든 빈 곳에 착수 불가능 시 패스 처리
                  currentPlayer = aiPlayer === 1 ? 2 : 1;
                  statusElement.textContent = `${aiPlayer === 1 ? '흑돌' : '백돌'} (AI)이 패스했습니다.`;
             }
@@ -297,12 +358,84 @@
             }
         }
 
-        // -- 바둑 규칙 로직 (이전과 동일) --
-        function hasLiberty(r, c, currentBoard = board) { /* ... (이전 코드와 동일) ... */ return false; }
-        function checkCaptures(r, c, player) { /* ... (이전 코드와 동일) ... */ return []; }
-        function getGroup(r, c, currentBoard, player) { /* ... (이전 코드와 동일) ... */ return []; }
+        // -- 바둑 규칙 로직 (숨 및 따냄) --
 
-        window.onload = startGame;
+        function hasLiberty(r, c, currentBoard) {
+            const player = currentBoard[r][c];
+            if (player === 0) return false;
+
+            const visited = new Set();
+            const queue = [[r, c]];
+            visited.add(`${r},${c}`);
+
+            while (queue.length > 0) {
+                const [currR, currC] = queue.shift();
+
+                for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                    const nr = currR + dr;
+                    const nc = currC + dc;
+
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                        if (currentBoard[nr][nc] === 0) {
+                            return true; 
+                        } else if (currentBoard[nr][nc] === player && !visited.has(`${nr},${nc}`)) {
+                            visited.add(`${nr},${nc}`);
+                            queue.push([nr, nc]);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function checkCaptures(r, c, player, currentBoard) {
+            const opponent = player === 1 ? 2 : 1;
+            const toRemove = [];
+
+            for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                const nr = r + dr;
+                const nc = c + dc;
+
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && currentBoard[nr][nc] === opponent) {
+                    if (!hasLiberty(nr, nc, currentBoard)) {
+                        getGroup(nr, nc, currentBoard, opponent).forEach(coord => {
+                             if (!toRemove.some(([tr, tc]) => tr === coord[0] && tc === coord[1])) {
+                                toRemove.push(coord);
+                             }
+                        });
+                    }
+                }
+            }
+            return toRemove;
+        }
+
+        function getGroup(r, c, currentBoard, player) {
+            const group = [];
+            const visited = new Set();
+            const queue = [[r, c]];
+            visited.add(`${r},${c}`);
+            group.push([r, c]);
+
+            while (queue.length > 0) {
+                const [currR, currC] = queue.shift();
+
+                for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                    const nr = currR + dr;
+                    const nc = currC + dc;
+
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && 
+                        currentBoard[nr][nc] === player && !visited.has(`${nr},${nc}`)) {
+                        
+                        visited.add(`${nr},${nc}`);
+                        group.push([nr, nc]);
+                        queue.push([nr, nc]);
+                    }
+                }
+            }
+            return group;
+        }
+
+        window.onload = initializeBoard;
     </script>
 </body>
 </html>
