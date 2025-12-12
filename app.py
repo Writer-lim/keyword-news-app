@@ -37,5 +37,9 @@ def search_news():
         print(f"Error fetching news: {e}")
         return jsonify({'error': '뉴스 검색 중 오류가 발생했습니다.'}), 500
 
+@app.route('/omok')
+def omok():
+    return render_template('omok.html')
+
 if __name__ == '__main__':
     app.run(debug=True)
