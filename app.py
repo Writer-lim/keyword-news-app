@@ -7,8 +7,8 @@ from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 
 # --- API 키 및 기본 설정 (실제 키로 대체 필요) ---
-NAVER_CLIENT_ID = "YOUR_NAVER_CLIENT_ID" # 실제 ID로 대체하세요
-NAVER_CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET" # 실제 Secret으로 대체하세요
+NAVER_CLIENT_ID = "AgwStYnlHOuNUOOn7kiD" # 실제 ID로 대체하세요
+NAVER_CLIENT_SECRET = "_ZBcX8Ec50" # 실제 Secret으로 대체하세요
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
