@@ -81,11 +81,11 @@
             grid-template-columns: repeat(15, 1fr);
         }
         
-        /* **클릭 가능 영역 (착수 불가 오류 해결 핵심)** */
+        /* **클릭 가능 영역 (Intersection)** */
         .intersection {
             cursor: pointer;
             position: relative;
-            /* **클릭 영역을 CELL_SIZE 크기로 확장** */
+            /* **클릭 영역을 100%로 유지** */
             width: 100%; 
             height: 100%;
             z-index: 10;
@@ -95,11 +95,12 @@
         .stone, .preview {
             border-radius: 50%;
             position: absolute;
+            /* 돌의 중심이 intersection cell의 좌상단 모서리(Grid 교차점)에 오도록 조정 */
             top: 0; 
             left: 0;
-            /* 돌의 중심을 intersection cell의 좌상단 모서리(Grid 교차점)에 오도록 조정 */
             transform: translate(-50%, -50%); 
             z-index: 20;
+            /* width/height는 JS에서 CELL_SIZE 기반으로 설정 */
         }
         .black { background-color: black; }
         .white { background-color: white; border: 1px solid #333; }
@@ -168,7 +169,7 @@
         function initializeBoard() {
              // 1. CELL_SIZE 계산
              const boardWidth = boardWrapper.clientWidth;
-             CELL_SIZE = boardWidth / (BOARD_SIZE - 1); // 14개 간격 기반
+             CELL_SIZE = boardWidth / (BOARD_SIZE - 1); 
 
              // 2. Lines Grid 재생성 (14x14)
              linesGrid.innerHTML = '';
@@ -197,7 +198,6 @@
                     intersection.addEventListener('mouseover', showPreview);
                     intersection.addEventListener('mouseout', hidePreview);
                     
-                    // **[핵심 수정] 착수 불가 문제 해결: 클릭 이벤트 재연결**
                     intersection.addEventListener('click', handleMove); 
                     intersectionsElement.appendChild(intersection);
                 }
@@ -215,7 +215,7 @@
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
             
-            // 돌 크기 설정 (CELL_SIZE에 비례)
+            // **[핵심 수정] 돌 크기 설정 (CELL_SIZE에 비례) - 착수 지점 시각적 오류 최소화**
             stone.style.width = `${CELL_SIZE * 0.9}px`;
             stone.style.height = `${CELL_SIZE * 0.9}px`;
 
@@ -238,8 +238,6 @@
             const c = parseInt(event.target.dataset.col);
 
             if (board[r][c] === 0) {
-                 // **[바둑 로직 제거] 오목은 착수 금지/자살 금지 로직 없음**
-                 
                  // 팝업 없이 바로 착수
                  placeStone(r, c, 1); 
                 
@@ -284,6 +282,7 @@
                     if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === player) {
                         count++;
                     } else { break; }
+                    
                 }
                 if (count >= 5) { return true; }
             }
@@ -347,13 +346,53 @@
         }
         
         // --- 기타 UI 컨트롤 함수 ---
-        document.querySelectorAll('#controls button[data-mode]').forEach(button => { /* ... */ });
-        document.getElementById('difficulty').addEventListener('change', (e) => { aiDepth = parseInt(e.target.value); });
-        function showPreview(event) { /* ... */ }
-        function hidePreview(event) { /* ... */ }
-        function startGame() { /* ... */ }
+        document.querySelectorAll('#controls button[data-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('#controls button[data-mode]').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                currentMode = button.dataset.mode;
+                startGame();
+            });
+        });
+        document.getElementById('difficulty').addEventListener('change', (e) => {
+            aiDepth = parseInt(e.target.value);
+        });
+        
+        function showPreview(event) {
+            if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return;
+            const r = parseInt(event.target.dataset.row);
+            const c = parseInt(event.target.dataset.col);
+            
+            if (board[r][c] === 0) {
+                const cell = event.target;
+                if (cell.querySelector('.stone') === null) {
+                    const previewStone = document.createElement('div');
+                    previewStone.className = 'stone black preview'; 
+                    previewStone.style.width = `${CELL_SIZE * 0.9}px`;
+                    previewStone.style.height = `${CELL_SIZE * 0.9}px`;
+                    cell.appendChild(previewStone);
+                }
+            }
+        }
 
-        window.onload = initializeBoard;
+        function hidePreview(event) {
+            const cell = event.target;
+            const previewStone = cell.querySelector('.preview');
+            if (previewStone) {
+                cell.removeChild(previewStone);
+            }
+        }
+        
+        function startGame() {
+            document.getElementById('difficulty').value = aiDepth.toString();
+            initializeBoard();
+            statusElement.textContent = '흑돌 차례입니다.';
+            if (currentMode === 'ai-ai') {
+                // AI vs AI 로직 필요시 추가
+            }
+        }
+
+        window.onload = startGame;
     </script>
 </body>
 </html>
