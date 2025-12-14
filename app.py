@@ -12,7 +12,7 @@ NAVER_CLIENT_ID = "AgwStYnlHOuNUOOn7kiD"
 NAVER_CLIENT_SECRET = "_ZBcX8Ec50" 
 
 # 🚨🚨🚨 최종 적용된 YouTube Data API Key 🚨🚨🚨
-YOUTUBE_API_KEY = "AIzaSyAM7Sc6RxrYBr_uSFcbSp8tuUGg9h2sPSM"
+YOUTUBE_API_KEY = "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGg9h2sPSM"
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
