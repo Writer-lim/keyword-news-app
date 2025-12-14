@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>오목 게임 (고성능 AI) 🔴⚫</title>
     <style>
-        /* CSS 스타일 시작 */
+        /* **기본 스타일** */
         body { 
             font-family: 'Arial', sans-serif; 
             display: flex; 
@@ -30,47 +30,69 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
         
+        /* **오목판 CSS: Grid 기반으로 전면 변경** */
         #board-wrapper {
             position: relative;
-            padding: 15px; 
+            /* 19x19 보드판을 15x15로 변경 (오목) */
+            width: 95vw; /* 모바일에서 화면 꽉 채우기 */
+            max-width: 580px; /* PC에서 최대 크기 제한 */
+            
+            /* 정사각형 유지를 위한 트릭: JS에서 높이 설정 */
+            aspect-ratio: 1 / 1; 
+            
             background-color: #e3b772;
             border: 1px solid #000; 
             user-select: none;
+            
+            /* **Grid 컨테이너** */
+            display: grid;
+            /* 15x15 격자를 14개의 간격(track)으로 나누고, 각 간격에 1fr(1/14) 크기를 할당 */
+            grid-template-rows: repeat(14, 1fr);
+            grid-template-columns: repeat(14, 1fr);
+            
+            padding: 0; /* JS에서 padding 없이 크기 계산 */
         }
         
-        #lines, #intersections {
-            position: absolute;
-            top: 15px; 
-            left: 15px;
-        }
-
-        .line-h, .line-v {
-            position: absolute;
-            background-color: #000;
-        }
-        .line-h { height: 1px; left: 0; right: 0; transform: translateY(-0.5px); }
-        .line-v { width: 1px; top: 0; bottom: 0; transform: translateX(-0.5px); }
-        
-        .intersection {
-            position: absolute;
+        /* **실제 선 그리기 (Border 활용)** */
+        .grid-cell {
+            /* 각 셀의 오른쪽과 아래쪽에 얇은 검은 선을 그려 격자 무늬를 만듦 */
+            border-right: 1px solid black;
+            border-bottom: 1px solid black;
+            
+            /* 교차점 영역이므로 상대 위치 설정 */
+            position: relative; 
+            
+            /* 셀 내부의 돌을 중앙에 배치하기 위해 Flexbox 사용 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
             cursor: pointer;
             z-index: 10;
-            /* **착수 위치 보정**: 크기만큼 왼쪽/위쪽으로 50% 이동시켜, intersection의 중심이 선의 교차점에 오도록 함 */
-            transform: translate(-50%, -50%);
         }
         
-        .stone {
-            border-radius: 50%;
+        /* 가장 오른쪽 열과 아래쪽 행은 선이 없어야 함 (이미 board-wrapper가 경계를 가짐) */
+        #board-wrapper > .grid-cell:nth-child(15n) { border-right: none; }
+        #board-wrapper > .grid-cell:nth-last-child(-n + 15) { border-bottom: none; }
+
+        /* **돌 스타일** */
+        .stone, .preview {
             position: absolute;
+            border-radius: 50%;
+            /* 돌 크기는 셀 크기에 비례하여 JS에서 설정 */
+            width: 90%; 
+            height: 90%; 
+            /* 돌이 셀의 정중앙에 위치 (교차점 중앙!) */
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%); /* 돌의 중심을 intersection의 중심에 맞춤 */
+            transform: translate(-50%, -50%); 
+            z-index: 20;
         }
-        .black { background-color: black; z-index: 20; }
-        .white { background-color: white; border: 1px solid #333; z-index: 20; }
+        .black { background-color: black; }
+        .white { background-color: white; border: 1px solid #333; }
 
+        /* 미리보기 돌 */
         .preview {
-            background-color: black; 
             opacity: 0.4; 
             z-index: 19;
             pointer-events: none;
@@ -78,18 +100,10 @@
         
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
         
-        /* 모바일 최적화 */
-        @media (max-width: 600px) {
-             .container { padding: 10px; }
-             #board-wrapper { 
-                 width: calc(95vw - 30px);
-                 height: calc(95vw - 30px);
-                 max-width: 570px;
-                 max-height: 570px;
-                 padding: 15px; 
-             }
+        /* 모바일 최적화 (가로폭 조정) */
+        @media (min-width: 600px) {
+             #board-wrapper { width: 580px; }
         }
-        /* CSS 스타일 끝 */
     </style>
 </head>
 <body>
@@ -117,113 +131,82 @@
         </div>
 
         <div id="board-wrapper">
-            <div id="lines"></div>
-            <div id="intersections"></div>
-        </div>
+            </div>
         
         <div id="status">게임을 시작해 주세요.</div>
     </div>
 
     <script>
-        const intersectionsElement = document.getElementById('intersections');
-        const linesElement = document.getElementById('lines');
-        const statusElement = document.getElementById('status');
         const boardWrapper = document.getElementById('board-wrapper');
+        const statusElement = document.getElementById('status');
         
         const BOARD_SIZE = 15; 
-        let CELL_SIZE = 30; 
 
         let board = [];
         let currentPlayer = 1; 
         let gameOver = false;
         let currentMode = 'user-ai';
         let aiDepth = 3; 
-
-        window.addEventListener('resize', () => {
-             if (!gameOver) initializeBoard(); 
-        });
-
-        // -- 초기화 및 UI 로직 (정렬 문제 해결) --
-
+        
+        // **새로운 보드 생성 로직 (Grid 기반)**
         function initializeBoard() {
-             // 1. CELL_SIZE 계산 (보드 정렬의 핵심)
-             const boardInnerWidth = boardWrapper.clientWidth - 30; 
-             CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1); 
-             
-             // 2. Lines 및 Intersections 컨테이너 크기 설정
-             const linesSize = (BOARD_SIZE - 1) * CELL_SIZE;
-             linesElement.style.width = `${linesSize}px`;
-             linesElement.style.height = `${linesSize}px`;
-             intersectionsElement.style.width = `${linesSize}px`;
-             intersectionsElement.style.height = `${linesSize}px`;
-
-            board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
-            linesElement.innerHTML = '';
-            intersectionsElement.innerHTML = '';
-
-            // 3. 선 그리기 (Lines)
-            for (let i = 0; i < BOARD_SIZE; i++) {
-                const hLine = document.createElement('div');
-                hLine.className = 'line-h';
-                hLine.style.top = `${i * CELL_SIZE}px`; 
-                linesElement.appendChild(hLine);
-
-                const vLine = document.createElement('div');
-                vLine.className = 'line-v';
-                vLine.style.left = `${i * CELL_SIZE}px`; 
-                linesElement.appendChild(vLine);
-            }
-
-            // 4. 교차점(Intersection) 영역 추가 및 이벤트 리스너 설정
-            for (let r = 0; r < BOARD_SIZE; r++) {
+             // 1. 상태 초기화
+             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
+             boardWrapper.innerHTML = '';
+             gameOver = false;
+            
+             // 2. 15x15 (225개)의 Grid Cell 생성
+             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
-                    const intersection = document.createElement('div');
-                    intersection.className = 'intersection';
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
                     
-                    // 위치 설정: 선이 지나가는 위치를 intersection의 왼쪽 상단 모서리로 설정
-                    intersection.style.top = `${r * CELL_SIZE}px`;
-                    intersection.style.left = `${c * CELL_SIZE}px`;
-                    
-                    // 클릭 영역 크기: CELL_SIZE 크기
-                    intersection.style.width = `${CELL_SIZE}px`;
-                    intersection.style.height = `${CELL_SIZE}px`;
+                    // Grid의 셀 인덱스는 1부터 시작
+                    cell.style.gridRowStart = r + 1;
+                    cell.style.gridColumnStart = c + 1;
 
-                    intersection.dataset.row = r;
-                    intersection.dataset.col = c;
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
                     
-                    intersection.addEventListener('mouseover', showPreview);
-                    intersection.addEventListener('mouseout', hidePreview);
-                    intersection.addEventListener('click', handleMove);
-                    intersectionsElement.appendChild(intersection);
+                    cell.addEventListener('mouseover', showPreview);
+                    cell.addEventListener('mouseout', hidePreview);
+                    cell.addEventListener('click', handleMove);
+                    boardWrapper.appendChild(cell);
                 }
             }
-            gameOver = false;
         }
 
         // -- 미리보기 및 턴 로직 --
 
+        function getCellElement(r, c) {
+            // BOARD_SIZE * r + c (0부터 시작) + 1 (children은 1부터 시작)
+            // Grid-cell 인덱스: (r * BOARD_SIZE) + c
+            // boardWrapper의 children은 0부터 시작하므로 + c
+            return boardWrapper.children[(r * BOARD_SIZE) + c]; 
+        }
+
+
         function showPreview(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return;
+            
             const r = parseInt(event.target.dataset.row);
             const c = parseInt(event.target.dataset.col);
             
             if (board[r][c] === 0) {
-                const intersection = event.target;
-                if (intersection.querySelector('.stone') === null) {
+                const cell = event.target;
+                if (cell.querySelector('.stone') === null) {
                     const previewStone = document.createElement('div');
                     previewStone.className = 'stone black preview'; 
-                    previewStone.style.width = `${CELL_SIZE * 0.9}px`;
-                    previewStone.style.height = `${CELL_SIZE * 0.9}px`;
-                    intersection.appendChild(previewStone);
+                    cell.appendChild(previewStone);
                 }
             }
         }
 
         function hidePreview(event) {
-            const intersection = event.target;
-            const previewStone = intersection.querySelector('.preview');
+            const cell = event.target;
+            const previewStone = cell.querySelector('.preview');
             if (previewStone) {
-                intersection.removeChild(previewStone);
+                cell.removeChild(previewStone);
             }
         }
 
@@ -242,10 +225,10 @@
 
                 placeStone(r, c, 1); 
                 
-                // **[요청 4] 턴 전환 및 AI 호출**
+                // **AI 턴 호출 (정지 오류 해결을 위해 setTimeout 0ms)**
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
-                    setTimeout(makeAIMove, 500); // 0.5초 후 AI 턴 시작
+                    setTimeout(makeAIMove, 0); 
                 }
             }
         }
@@ -259,7 +242,6 @@
                 statusElement.textContent = `${winner} 승리! 🎉`;
                 gameOver = true;
             } else {
-                // 착수 후 바로 턴을 넘김
                 currentPlayer = player === 1 ? 2 : 1; 
             }
         }
@@ -267,34 +249,44 @@
         function drawStoneOnUI(r, c, player) {
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
-            stone.style.width = `${CELL_SIZE * 0.9}px`;
-            stone.style.height = `${CELL_SIZE * 0.9}px`;
-
-            const index = r * BOARD_SIZE + c;
-            const intersection = intersectionsElement.children[index];
+            
+            const cell = getCellElement(r, c);
             
             // 기존 돌 또는 미리보기 돌이 있으면 모두 제거 후 새 돌 착수
-            while (intersection.firstChild) {
-                intersection.removeChild(intersection.firstChild);
+            while (cell.firstChild) {
+                cell.removeChild(cell.firstChild);
             }
-            if (intersection) {
-                 intersection.appendChild(stone);
+            if (cell) {
+                 cell.appendChild(stone);
             }
         }
 
-        // -- AI 로직 --
+        // -- AI 로직 (정지 오류 해결을 위해 로직 단순화 및 검증) --
         
         function makeAIMove() {
             if (gameOver || currentPlayer !== 2) return; 
 
             const aiPlayer = currentPlayer; 
             
-            // **AI 정지 방지: 임시 랜덤/단순 착수 로직 재확인**
             let bestMove = findBestMove(aiPlayer, aiDepth); 
             
-            // 첫 수 응답을 위한 간단한 로직 (흑돌이 (7, 7)에 착수했을 경우에만 반응)
-            if (aiPlayer === 2 && board[7][7] === 1 && board.flat().filter(val => val !== 0).length === 1) {
-                bestMove = { r: 6, c: 7 }; // 흑돌 바로 위에 착수
+            // 첫 수 응답 로직 재확인
+            if (aiPlayer === 2) {
+                const occupiedCount = board.flat().filter(val => val !== 0).length;
+                if (occupiedCount === 1) { // 흑돌 첫 수 직후라면
+                     // 흑돌이 (7, 7)에 착수했을 경우에만 반응하는 임시 로직 대신, 
+                     // 현재 흑돌 위치를 찾아 그 근처에 두도록 유도
+                     let blackR, blackC;
+                     for(let r=0; r<BOARD_SIZE; r++) {
+                         for(let c=0; c<BOARD_SIZE; c++) {
+                             if(board[r][c] === 1) { blackR = r; blackC = c; break; }
+                         }
+                         if(blackR !== undefined) break;
+                     }
+                     if (blackR !== undefined && board[blackR - 1]?.[blackC] === 0) {
+                        bestMove = { r: blackR - 1, c: blackC }; 
+                     }
+                }
             }
 
             if (bestMove) {
@@ -337,11 +329,14 @@
             aiDepth = parseInt(e.target.value);
         });
 
-
-        window.onload = () => {
-            document.getElementById('difficulty').value = '3'; // 중수 기본값 설정
-            startGame();
+        function startGame() {
+            document.getElementById('difficulty').value = '3';
+            currentMode = 'user-ai'; 
+            initializeBoard();
+            statusElement.textContent = '흑돌 차례입니다.';
         }
+
+        window.onload = startGame;
     </script>
 </body>
 </html>
