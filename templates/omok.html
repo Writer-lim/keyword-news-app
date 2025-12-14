@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>오목 게임 (고성능 AI) 🔴⚫</title>
     <style>
-        /* **CSS 깨짐 방지 및 기본 스타일** */
+        /* CSS 스타일 시작 */
         body { 
             font-family: 'Arial', sans-serif; 
             display: flex; 
@@ -17,7 +17,7 @@
         }
         .container { 
             max-width: 600px; 
-            margin: 20px auto; /* 중앙 정렬 */
+            margin: 20px auto;
             padding: 20px; 
             background: white; 
             border-radius: 8px; 
@@ -30,37 +30,33 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
         
-        /* **오목판 CSS** */
         #board-wrapper {
             position: relative;
             padding: 15px; 
             background-color: #e3b772;
             border: 1px solid #000; 
             user-select: none;
-            /* width/height는 JS에서 동적으로 설정 */
         }
         
-        /* Lines와 Intersections는 padding을 상쇄하고 보드판의 실제 선 영역만 차지함 */
         #lines, #intersections {
             position: absolute;
             top: 15px; 
             left: 15px;
-            /* width/height는 JS에서 동적으로 설정 */
         }
 
         .line-h, .line-v {
             position: absolute;
             background-color: #000;
         }
-        /* 라인의 두께를 1px로 고정하고 중앙 정렬 */
         .line-h { height: 1px; left: 0; right: 0; transform: translateY(-0.5px); }
         .line-v { width: 1px; top: 0; bottom: 0; transform: translateX(-0.5px); }
         
-        /* **착수 위치 정렬 핵심** */
         .intersection {
             position: absolute;
             cursor: pointer;
             z-index: 10;
+            /* **착수 위치 보정**: 크기만큼 왼쪽/위쪽으로 50% 이동시켜, intersection의 중심이 선의 교차점에 오도록 함 */
+            transform: translate(-50%, -50%);
         }
         
         .stone {
@@ -68,8 +64,7 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            /* 돌을 정확히 intersection div 중앙에 위치 */
-            transform: translate(-50%, -50%); 
+            transform: translate(-50%, -50%); /* 돌의 중심을 intersection의 중심에 맞춤 */
         }
         .black { background-color: black; z-index: 20; }
         .white { background-color: white; border: 1px solid #333; z-index: 20; }
@@ -83,18 +78,18 @@
         
         #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
         
-        /* **모바일 최적화** */
+        /* 모바일 최적화 */
         @media (max-width: 600px) {
              .container { padding: 10px; }
              #board-wrapper { 
-                 /* 화면 너비의 95%를 사용하고, 그 크기를 기준으로 내부를 채움 */
                  width: calc(95vw - 30px);
                  height: calc(95vw - 30px);
-                 max-width: 570px; /* PC에서도 max-width 제한 */
+                 max-width: 570px;
                  max-height: 570px;
                  padding: 15px; 
              }
         }
+        /* CSS 스타일 끝 */
     </style>
 </head>
 <body>
@@ -134,8 +129,6 @@
         const linesElement = document.getElementById('lines');
         const statusElement = document.getElementById('status');
         const boardWrapper = document.getElementById('board-wrapper');
-        const difficultySelect = document.getElementById('difficulty');
-        const modeButtons = document.querySelectorAll('#controls button[data-mode]');
         
         const BOARD_SIZE = 15; 
         let CELL_SIZE = 30; 
@@ -147,7 +140,6 @@
         let aiDepth = 3; 
 
         window.addEventListener('resize', () => {
-             // 크기가 변하면 보드 재생성 (정렬 문제 방지)
              if (!gameOver) initializeBoard(); 
         });
 
@@ -155,7 +147,6 @@
 
         function initializeBoard() {
              // 1. CELL_SIZE 계산 (보드 정렬의 핵심)
-             // boardWrapper의 padding을 뺀 실제 보드판 크기
              const boardInnerWidth = boardWrapper.clientWidth - 30; 
              CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1); 
              
@@ -189,9 +180,11 @@
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // 위치와 크기를 동적으로 설정
+                    // 위치 설정: 선이 지나가는 위치를 intersection의 왼쪽 상단 모서리로 설정
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
+                    
+                    // 클릭 영역 크기: CELL_SIZE 크기
                     intersection.style.width = `${CELL_SIZE}px`;
                     intersection.style.height = `${CELL_SIZE}px`;
 
@@ -207,16 +200,15 @@
             gameOver = false;
         }
 
-        // **[요청 2] 마우스 오버 시 투명 돌 표시 기능**
+        // -- 미리보기 및 턴 로직 --
+
         function showPreview(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return;
-            
             const r = parseInt(event.target.dataset.row);
             const c = parseInt(event.target.dataset.col);
             
             if (board[r][c] === 0) {
                 const intersection = event.target;
-                
                 if (intersection.querySelector('.stone') === null) {
                     const previewStone = document.createElement('div');
                     previewStone.className = 'stone black preview'; 
@@ -235,33 +227,6 @@
             }
         }
 
-
-        modeButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                modeButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                currentMode = button.dataset.mode;
-                startGame();
-            });
-        });
-
-        difficultySelect.addEventListener('change', () => {
-            aiDepth = parseInt(difficultySelect.value);
-        });
-
-        function startGame() {
-            aiDepth = parseInt(difficultySelect.value); 
-            currentPlayer = 1; 
-            initializeBoard();
-            statusElement.textContent = '흑돌 차례입니다.';
-            
-            if (currentMode === 'ai-ai') {
-                runAIGame();
-            }
-        }
-
-        // -- 게임 흐름 제어 로직 (턴 로직 재확인) --
-
         function handleMove(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
 
@@ -275,13 +240,12 @@
                     return; 
                 }
 
-                placeStone(r, c, 1); // 흑돌 착수
+                placeStone(r, c, 1); 
                 
-                // **[요청 4] 턴 전환: 착수 완료 후 백돌 턴으로 넘김**
+                // **[요청 4] 턴 전환 및 AI 호출**
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중...';
-                    // AI 턴: 비동기 처리
-                    setTimeout(makeAIMove, 500); 
+                    setTimeout(makeAIMove, 500); // 0.5초 후 AI 턴 시작
                 }
             }
         }
@@ -295,30 +259,21 @@
                 statusElement.textContent = `${winner} 승리! 🎉`;
                 gameOver = true;
             } else {
-                // **턴 전환**
+                // 착수 후 바로 턴을 넘김
                 currentPlayer = player === 1 ? 2 : 1; 
-                
-                if (currentMode !== 'ai-ai') {
-                    // 사용자 vs AI 모드에서는 AI 턴 시작 직전에 UI 업데이트를 makeAIMove 함수로 이관했음.
-                    // AI vs AI 모드에서만 다음 턴을 준비함.
-                    if (currentPlayer === 1) { // AI vs AI 모드에서만
-                       statusElement.textContent = `흑돌 차례입니다.`;
-                    }
-                }
             }
         }
         
         function drawStoneOnUI(r, c, player) {
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
-            
             stone.style.width = `${CELL_SIZE * 0.9}px`;
             stone.style.height = `${CELL_SIZE * 0.9}px`;
 
             const index = r * BOARD_SIZE + c;
             const intersection = intersectionsElement.children[index];
             
-            // 기존 돌 또는 미리보기 돌이 있으면 제거하고 새 돌 착수
+            // 기존 돌 또는 미리보기 돌이 있으면 모두 제거 후 새 돌 착수
             while (intersection.firstChild) {
                 intersection.removeChild(intersection.firstChild);
             }
@@ -329,29 +284,25 @@
 
         // -- AI 로직 --
         
-        function makeAIMove(isAIVsAI = false) {
-            if (gameOver || currentPlayer !== 2) return; // AI는 백돌(2)만 움직임.
+        function makeAIMove() {
+            if (gameOver || currentPlayer !== 2) return; 
 
             const aiPlayer = currentPlayer; 
             
-            // 임시 AI 로직 (Minimax 함수 대신 랜덤 선택 또는 간단한 첫 수 중앙 착수)
+            // **AI 정지 방지: 임시 랜덤/단순 착수 로직 재확인**
             let bestMove = findBestMove(aiPlayer, aiDepth); 
             
-            // AI가 백일 경우, 흑돌 주변에 착수하는 임의 로직
-            if (aiPlayer === 2 && board.flat().filter(val => val !== 0).length === 1) {
-                // 흑돌이 (7, 7)에 있다고 가정하고 (6, 7)에 착수
-                bestMove = { r: 6, c: 7 }; 
+            // 첫 수 응답을 위한 간단한 로직 (흑돌이 (7, 7)에 착수했을 경우에만 반응)
+            if (aiPlayer === 2 && board[7][7] === 1 && board.flat().filter(val => val !== 0).length === 1) {
+                bestMove = { r: 6, c: 7 }; // 흑돌 바로 위에 착수
             }
 
             if (bestMove) {
                 placeStone(bestMove.r, bestMove.c, aiPlayer);
             }
             
-            if (isAIVsAI && !gameOver) {
-                 const nextPlayer = currentPlayer === 1 ? '흑돌' : '백돌';
-                 statusElement.textContent = `${nextPlayer} 차례입니다.`;
-            } else if (!gameOver) {
-                // 사용자 vs AI 모드에서 AI 착수 후 다시 흑돌 차례로 UI 업데이트
+            if (!gameOver) {
+                // AI 착수 후 다시 흑돌 차례로 UI 업데이트
                 statusElement.textContent = '흑돌 차례입니다.';
             }
         }
@@ -370,10 +321,27 @@
              }
              return null;
         } 
-        function checkWin(r, c, player) { /* ... */ return false; }
+        function checkWin(r, c, player) { return false; }
 
 
-        window.onload = startGame;
+        // --- 컨트롤 함수 ---
+        document.querySelectorAll('#controls button[data-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('#controls button[data-mode]').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                currentMode = button.dataset.mode;
+                startGame();
+            });
+        });
+        document.getElementById('difficulty').addEventListener('change', (e) => {
+            aiDepth = parseInt(e.target.value);
+        });
+
+
+        window.onload = () => {
+            document.getElementById('difficulty').value = '3'; // 중수 기본값 설정
+            startGame();
+        }
     </script>
 </body>
 </html>
