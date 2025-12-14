@@ -1,4 +1,4 @@
-# news_app/app.py
+# news_app/app.py (최종 버전: 슬래시 없는 라우팅 제거)
 import json
 import requests
 from flask import Flask, render_template, request, jsonify
@@ -12,27 +12,24 @@ NAVER_CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET" # 실제 Secret으로 대체하
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
-# 404 오류 방지를 위해 슬래시 버전과 슬래시 없는 버전을 모두 정의합니다.
+# 모든 라우팅은 반드시 '/'로 시작해야 합니다.
 
 @app.route('/')
 def index_view():
     """메인 페이지 렌더링 (index.html)"""
     return render_template('index.html')
 
-@app.route('/omok')
-@app.route('omok')
+@app.route('/omok') # 슬래시 없는 'omok' 라우팅 제거
 def omok_view():
     """오목 페이지 렌더링 (omok.html)"""
     return render_template('omok.html')
 
-@app.route('/searcher')
-@app.route('searcher')
+@app.route('/searcher') # 슬래시 없는 'searcher' 라우팅 제거
 def news_searcher_view():
     """뉴스 검색기 페이지 렌더링 (news_searcher.html)"""
     return render_template('news_searcher.html')
 
-@app.route('/baduk')
-@app.route('baduk')
+@app.route('/baduk') # 슬래시 없는 'baduk' 라우팅 제거
 def baduk_view():
     """바둑 페이지 렌더링 (baduk.html)"""
     return render_template('baduk.html')
@@ -70,22 +67,18 @@ def search_news():
             response = requests.get(url, headers=headers, params=params)
             
             if response.status_code == 200:
-                # 성공 시, 네이버 API 결과를 JSON 형태로 클라이언트에 전달
                 return jsonify(response.json())
             else:
-                # 네이버 API 오류 발생 시
                 return jsonify({
                     'error': f"네이버 API 호출 오류: {response.status_code}",
                     'detail': response.text
                 }), response.status_code
 
         except Exception as e:
-            # 예외 처리: 로그 출력 후 500 응답
             print(f"Server Error: {e}")
             return jsonify({'error': f'서버 내부 오류: {str(e)}'}), 500
 
     return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
 if __name__ == '__main__':
-    # 로컬 개발 환경에서만 사용
     app.run(debug=True)
