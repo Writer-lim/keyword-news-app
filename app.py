@@ -1,17 +1,19 @@
+# news_app/app.py
 import json
 import requests
 from flask import Flask, render_template, request, jsonify
 
+# Flask 애플리케이션 인스턴스 생성
 app = Flask(__name__)
 
 # --- API 키 및 기본 설정 (실제 키로 대체 필요) ---
-# 실제 환경에서는 환경 변수를 사용해야 합니다.
 NAVER_CLIENT_ID = "YOUR_NAVER_CLIENT_ID" # 실제 ID로 대체하세요
 NAVER_CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET" # 실제 Secret으로 대체하세요
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
 # 404 오류 방지를 위해 슬래시 버전과 슬래시 없는 버전을 모두 정의합니다.
+# (URL 경로를 정의합니다.)
 
 @app.route('/')
 def index_view():
@@ -46,12 +48,14 @@ def search_news():
     """
     if request.method == 'POST':
         try:
+            # POST 요청 본문에서 JSON 데이터 파싱
             data = request.get_json()
             keyword = data.get('keyword', '')
             
             if not keyword:
                 return jsonify({'error': '키워드가 필요합니다.'}), 400
 
+            # 네이버 API 호출 설정
             headers = {
                 'X-Naver-Client-Id': NAVER_CLIENT_ID,
                 'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
@@ -63,6 +67,7 @@ def search_news():
                 'sort': 'date'
             }
 
+            # API 요청 및 응답 처리
             response = requests.get(url, headers=headers, params=params)
             
             if response.status_code == 200:
@@ -76,10 +81,12 @@ def search_news():
                 }), response.status_code
 
         except Exception as e:
+            # 예외 처리: 로그 출력 후 500 응답
             print(f"Server Error: {e}")
             return jsonify({'error': f'서버 내부 오류: {str(e)}'}), 500
 
     return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
 if __name__ == '__main__':
+    # 로컬 개발 환경에서만 사용
     app.run(debug=True)
