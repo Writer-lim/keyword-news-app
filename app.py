@@ -13,7 +13,6 @@ NAVER_CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET" # 실제 Secret으로 대체하
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
 # 404 오류 방지를 위해 슬래시 버전과 슬래시 없는 버전을 모두 정의합니다.
-# (URL 경로를 정의합니다.)
 
 @app.route('/')
 def index_view():
