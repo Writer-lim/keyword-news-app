@@ -1,4 +1,3 @@
-# news_app/app.py
 import json
 import requests
 from flask import Flask, render_template, request, jsonify
@@ -10,7 +9,9 @@ app = Flask(__name__)
 NAVER_CLIENT_ID = "YOUR_NAVER_CLIENT_ID" # 실제 ID로 대체하세요
 NAVER_CLIENT_SECRET = "YOUR_NAVER_CLIENT_SECRET" # 실제 Secret으로 대체하세요
 
+
 # --- 1. UI 라우팅 (페이지 렌더링) ---
+# 404 오류 방지를 위해 슬래시 버전과 슬래시 없는 버전을 모두 정의합니다.
 
 @app.route('/')
 def index_view():
@@ -18,14 +19,22 @@ def index_view():
     return render_template('index.html')
 
 @app.route('/omok')
+@app.route('omok')
 def omok_view():
     """오목 페이지 렌더링 (omok.html)"""
     return render_template('omok.html')
 
 @app.route('/searcher')
+@app.route('searcher')
 def news_searcher_view():
     """뉴스 검색기 페이지 렌더링 (news_searcher.html)"""
     return render_template('news_searcher.html')
+
+@app.route('/baduk')
+@app.route('baduk')
+def baduk_view():
+    """바둑 페이지 렌더링 (baduk.html)"""
+    return render_template('baduk.html')
 
 
 # --- 2. API 라우팅 (뉴스 검색 로직) ---
@@ -37,14 +46,12 @@ def search_news():
     """
     if request.method == 'POST':
         try:
-            # 1. 요청 본문에서 JSON 데이터 파싱 (Flask에서는 request.get_json() 사용)
             data = request.get_json()
             keyword = data.get('keyword', '')
             
             if not keyword:
                 return jsonify({'error': '키워드가 필요합니다.'}), 400
 
-            # 2. 네이버 API 호출 설정
             headers = {
                 'X-Naver-Client-Id': NAVER_CLIENT_ID,
                 'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
@@ -56,7 +63,6 @@ def search_news():
                 'sort': 'date'
             }
 
-            # 3. API 요청 및 응답 처리
             response = requests.get(url, headers=headers, params=params)
             
             if response.status_code == 200:
@@ -70,13 +76,10 @@ def search_news():
                 }), response.status_code
 
         except Exception as e:
-            # 예상치 못한 기타 오류 처리
             print(f"Server Error: {e}")
             return jsonify({'error': f'서버 내부 오류: {str(e)}'}), 500
 
-    # POST 요청이 아닌 경우
     return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
 if __name__ == '__main__':
-    # 디버그 모드는 개발 환경에서만 사용해야 합니다.
     app.run(debug=True)

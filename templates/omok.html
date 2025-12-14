@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <title>오목 게임 (클린 버전) 🔴⚫</title>
     <style>
-        /* **기본 레이아웃 및 컨트롤** */
         body { 
             font-family: 'Arial', sans-serif; 
             display: flex; 
@@ -28,23 +27,18 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
         
-        /* **오목판 CSS: 고정 패딩 및 Absolute Positioning으로 정렬** */
         #board-wrapper {
             position: relative;
             width: 95vw;
             max-width: 580px; 
             aspect-ratio: 1 / 1; 
-            
-            /* **고정 패딩**: 보드 크기 계산의 안정성을 위해 CSS에서 직접 지정 */
             padding: 20px; 
-            box-sizing: border-box; /* 패딩을 전체 크기에 포함 */
-            
+            box-sizing: border-box; 
             background-color: #e3b772;
             border: 1px solid #000; 
             user-select: none;
         }
 
-        /* 선과 교차점 컨테이너: 패딩 영역 안쪽을 100% 사용 */
         #lines, #intersections {
             position: absolute;
             top: 20px; 
@@ -53,21 +47,17 @@
             bottom: 20px;
         }
         
-        /* **선 스타일** */
         .line-h, .line-v {
             position: absolute;
             background-color: #000;
         }
-        /* 선의 중앙이 해당 픽셀 위치에 오도록 보정 */
         .line-h { height: 1px; transform: translateY(-0.5px); } 
         .line-v { width: 1px; transform: translateX(-0.5px); }
         
-        /* **착수 영역 (Intersection) 및 돌 스타일** */
         .intersection {
             position: absolute;
             cursor: pointer;
             z-index: 10;
-            /* 돌을 포함할 컨테이너의 중심을 교차점에 위치 */
             transform: translate(-50%, -50%); 
         }
         
@@ -76,7 +66,6 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            /* 돌의 중심을 intersection의 중심 (교차점)에 맞춤 */
             transform: translate(-50%, -50%); 
             z-index: 20;
         }
@@ -125,7 +114,7 @@
         const statusElement = document.getElementById('status');
         
         const BOARD_SIZE = 15; 
-        const BOARD_PADDING = 20; // CSS의 padding 값과 일치해야 함
+        const BOARD_PADDING = 20; 
         let CELL_SIZE = 30; 
 
         let board = [];
@@ -138,13 +127,10 @@
              if (!gameOver) initializeBoard(false); 
         });
         
-        // --- 초기화 및 UI 로직 (클린 버전) ---
         function initializeBoard(resetGame = true) {
-             // 1. CELL_SIZE 계산 (보드 크기의 핵심)
              const boardInnerWidth = boardWrapper.clientWidth - (BOARD_PADDING * 2); 
              CELL_SIZE = boardInnerWidth / (BOARD_SIZE - 1); 
              
-             // 2. 초기화 (재시작 시에만)
              if (resetGame) {
                 board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
                 gameOver = false;
@@ -153,11 +139,9 @@
              linesElement.innerHTML = '';
              intersectionsElement.innerHTML = '';
              
-             // 3. 선 그리기 (Lines)
-             const linesSize = (BOARD_SIZE - 1) * CELL_SIZE; // 선이 그려질 영역 크기
+             const linesSize = (BOARD_SIZE - 1) * CELL_SIZE;
 
             for (let i = 0; i < BOARD_SIZE; i++) {
-                // 가로선
                 const hLine = document.createElement('div');
                 hLine.className = 'line-h';
                 hLine.style.top = `${i * CELL_SIZE}px`; 
@@ -165,7 +149,6 @@
                 hLine.style.width = `${linesSize}px`;
                 linesElement.appendChild(hLine);
 
-                // 세로선
                 const vLine = document.createElement('div');
                 vLine.className = 'line-v';
                 vLine.style.left = `${i * CELL_SIZE}px`; 
@@ -174,17 +157,14 @@
                 linesElement.appendChild(vLine);
             }
 
-            // 4. 교차점(Intersection) 영역 추가 및 이벤트 리스너 설정
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // **[착수 위치 핵심]** Intersection의 중심을 정확히 교차점에 위치
                     intersection.style.top = `${r * CELL_SIZE}px`;
                     intersection.style.left = `${c * CELL_SIZE}px`;
                     
-                    // 클릭 영역 크기: CELL_SIZE 크기
                     intersection.style.width = `${CELL_SIZE}px`;
                     intersection.style.height = `${CELL_SIZE}px`;
 
@@ -196,7 +176,6 @@
                     intersection.addEventListener('click', handleMove);
                     intersectionsElement.appendChild(intersection);
                     
-                    // 리사이즈 시 기존 돌 다시 그리기
                     if (!resetGame && board[r][c] !== 0) {
                         drawStoneOnUI(r, c, board[r][c]);
                     }
@@ -204,7 +183,6 @@
             }
         }
 
-        // --- 요소 접근 및 UI 그리기 ---
         function getCellElement(r, c) {
             return intersectionsElement.children[(r * BOARD_SIZE) + c]; 
         }
@@ -213,7 +191,6 @@
             const stone = document.createElement('div');
             stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
             
-            // **돌 크기 설정 (CELL_SIZE에 비례)**
             stone.style.width = `${CELL_SIZE * 0.9}px`;
             stone.style.height = `${CELL_SIZE * 0.9}px`;
 
@@ -227,8 +204,6 @@
             }
         }
         
-        // --- 게임 흐름 제어 ---
-
         function handleMove(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
             const r = parseInt(event.target.dataset.row);
@@ -237,7 +212,6 @@
                  placeStone(r, c, 1); 
                 if (!gameOver) {
                     statusElement.textContent = '백돌 (AI)이 생각 중... (최대 10초)';
-                    // AI가 수를 두도록 지연 호출
                     setTimeout(makeAIMove, 500); 
                 }
             }
@@ -259,7 +233,6 @@
             }
         }
         
-        // --- 승리 판정 구현 (유지) ---
         function checkWin(r, c, player) {
             const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (const [dr, dc] of directions) {
@@ -284,13 +257,10 @@
             return false;
         }
 
-        // --- **AI 로직: 시간 제한을 위한 간소화된 탐색 로직** ---
-        
         function makeAIMove() {
             if (gameOver || currentPlayer !== 2) return; 
             const aiPlayer = currentPlayer; 
             
-            // 시간 제한을 위해 Minimax 대신 간소화된 휴리스틱 탐색 사용
             const move = findBestMoveSimplified(aiPlayer);
             
             if (move) {
@@ -311,21 +281,21 @@
 
              if (emptySpots.length === 0) return null;
              
-             // 1. 현재 수가 승리하는지 확인 (최우선)
+             // 1. 현재 수가 승리하는지 확인
              for (const {r, c} of emptySpots) {
                  board[r][c] = player;
                  if (checkWin(r, c, player)) { board[r][c] = 0; return {r, c}; }
                  board[r][c] = 0;
              }
              
-             // 2. 상대방의 승리를 막는지 확인 (차선책)
+             // 2. 상대방의 승리를 막는지 확인
              for (const {r, c} of emptySpots) {
                  board[r][c] = opponent; 
                  if (checkWin(r, c, opponent)) { board[r][c] = 0; return {r, c}; }
                  board[r][c] = 0;
              }
              
-             // 3. 주변에 착수 (게임 진행을 위한 휴리스틱)
+             // 3. 주변에 착수
              let neighbors = emptySpots.filter(({r, c}) => {
                 for (let dr = -1; dr <= 1; dr++) {
                     for (let dc = -1; dc <= 1; dc++) {
@@ -341,16 +311,13 @@
              });
              
              if (neighbors.length > 0) {
-                 // 주변 착수 지점 중 랜덤 선택
                  return neighbors[Math.floor(Math.random() * neighbors.length)];
              }
              
-             // 4. 중앙 착수 (최후의 수단)
+             // 4. 중앙 착수 (랜덤)
              return emptySpots[Math.floor(Math.random() * emptySpots.length)];
         }
         
-        // --- 기타 UI 컨트롤 함수 ---
-
         function showPreview(event) {
             if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return;
             const r = parseInt(event.target.dataset.row);

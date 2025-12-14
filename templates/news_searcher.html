@@ -5,98 +5,197 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>키워드 뉴스 검색기</title>
     <style>
-        /* 기본적인 디자인 (CSS) */
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        h1 { text-align: center; color: #333; }
-        #search-form { display: flex; margin-bottom: 20px; }
-        #keyword-input { flex-grow: 1; padding: 10px; border: 2px solid #ddd; border-radius: 4px 0 0 4px; font-size: 16px; }
-        #search-button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 0 4px 4px 0; cursor: pointer; font-size: 16px; }
-        #search-button:hover { background-color: #0056b3; }
-        .article { border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 6px; background: #fff; transition: box-shadow 0.3s; }
-        .article:hover { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15); }
-        .article h2 a { font-size: 1.2em; color: #007bff; text-decoration: none; }
-        .article p { color: #555; font-size: 0.9em; margin: 5px 0; }
-        #loading { text-align: center; font-size: 1.1em; color: #007bff; display: none; margin-top: 20px; }
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 50px 0;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        #search-form {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #keyword {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px 0 0 6px;
+            font-size: 16px;
+        }
+        #search-button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 0 6px 6px 0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        #search-button:hover {
+            background-color: #0056b3;
+        }
+        #error-message, #loading {
+            color: red;
+            text-align: center;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        #news-results {
+            list-style: none;
+            padding: 0;
+        }
+        .news-item {
+            border-bottom: 1px solid #eee;
+            padding: 15px 0;
+        }
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        .news-item a {
+            font-size: 18px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .news-item a:hover {
+            text-decoration: underline;
+        }
+        .news-item .description {
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .news-item .date {
+            font-size: 12px;
+            color: #888;
+        }
+        .nav-links {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+             margin: 0 10px; 
+             text-decoration: none; 
+             color: #007bff;
+        }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <h1>키워드 뉴스 검색기 📰</h1>
-
-        <form id="search-form">
-            <input type="text" id="keyword-input" placeholder="검색할 키워드를 입력하세요 (예: 비트코인, 날씨, 인공지능)">
-            <button type="submit" id="search-button">검색</button>
-        </form>
-
-        <div id="loading">뉴스 검색 중... 잠시만 기다려주세요.</div>
-        
-        <div id="results">
-            <p style="text-align: center; color: #888;">키워드를 입력하고 검색 버튼을 눌러주세요.</p>
+        <div class="nav-links">
+            <a href="/">메인 페이지로 돌아가기</a>
         </div>
+        <h1>키워드 뉴스 검색기 📰</h1>
+        
+        <div id="search-form">
+            <input type="text" id="keyword" placeholder="검색할 키워드를 입력하세요" value="코인">
+            <button id="search-button">검색</button>
+        </div>
+        
+        <div id="loading" style="display: none;">검색 중...</div>
+        <div id="error-message"></div>
+        
+        <ul id="news-results">
+            </ul>
     </div>
 
     <script>
-        // 프론트엔드와 백엔드를 연결하는 코드 (JavaScript)
+        const keywordInput = document.getElementById('keyword');
+        const searchButton = document.getElementById('search-button');
+        const resultsContainer = document.getElementById('news-results');
+        const errorMessage = document.getElementById('error-message');
+        const loadingMessage = document.getElementById('loading');
         
-        const form = document.getElementById('search-form');
-        const input = document.getElementById('keyword-input');
-        const resultsDiv = document.getElementById('results');
-        const loadingDiv = document.getElementById('loading');
-
-        form.addEventListener('submit', function(e) {
-            e.preventDefault(); // 기본 폼 제출 동작 막기
-            
-            const keyword = input.value.trim();
-            if (!keyword) return;
-
-            // 검색 시작 시 로딩 표시
-            resultsDiv.innerHTML = '';
-            loadingDiv.style.display = 'block';
-
-            // 1. 주방(백엔드)으로 키워드를 전달하는 요청 보내기
-            fetch(`/search?keyword=${encodeURIComponent(keyword)}`)
-                .then(response => response.json()) // 응답을 JSON 형식으로 변환
-                .then(data => {
-                    loadingDiv.style.display = 'none'; // 로딩 숨기기
-                    
-                    // 2. 받은 데이터(뉴스 목록)를 화면에 표시
-                    displayResults(data.articles);
-                })
-                .catch(error => {
-                    loadingDiv.style.display = 'none';
-                    resultsDiv.innerHTML = `<p style="color: red; text-align: center;">오류 발생: ${error}. 콘솔을 확인해주세요.</p>`;
-                    console.error('검색 중 오류 발생:', error);
-                });
+        searchButton.addEventListener('click', searchNews);
+        keywordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchNews();
+            }
         });
 
-        function displayResults(articles) {
-            resultsDiv.innerHTML = ''; // 이전 결과 지우기
+        function cleanHtml(htmlString) {
+            return htmlString.replace(/<[^>]*>/g, '');
+        }
+        
+        function formatNewsDate(dateString) {
+            if (dateString && dateString.length === 8) {
+                return dateString.substring(0, 4) + '.' + dateString.substring(4, 6) + '.' + dateString.substring(6, 8);
+            }
+            return dateString;
+        }
 
-            if (!articles || articles.length === 0) {
-                resultsDiv.innerHTML = '<p style="text-align: center;">검색 결과가 없습니다.</p>';
+        async function searchNews() {
+            const keyword = keywordInput.value.trim();
+            if (!keyword) {
+                errorMessage.textContent = '키워드를 입력해 주세요.';
                 return;
             }
 
-            articles.forEach(article => {
-                // 각 뉴스 기사를 예쁘게 포맷하여 화면에 추가
-                const articleDiv = document.createElement('div');
-                articleDiv.className = 'article';
-                
-                const title = article.title || '제목 없음';
-                const description = article.description || '내용 요약 없음';
-                const url = article.url || '#';
-                const source = article.source ? article.source.name : '출처 미상';
-                const date = new Date(article.publishedAt).toLocaleDateString('ko-KR');
+            errorMessage.textContent = '';
+            resultsContainer.innerHTML = '';
+            loadingMessage.style.display = 'block';
 
-                articleDiv.innerHTML = `
-                    <h2><a href="${url}" target="_blank">${title}</a></h2>
-                    <p>${description}</p>
-                    <p style="font-size: 0.8em; color: #999;">${source} - ${date}</p>
-                `;
-                resultsDiv.appendChild(articleDiv);
-            });
+            try {
+                // API 호출 경로를 명확히 지정합니다.
+                const response = await fetch('/api/search_news/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ keyword: keyword })
+                });
+
+                const data = await response.json(); 
+
+                if (response.ok) {
+                    if (data.items && data.items.length > 0) {
+                        data.items.forEach(item => {
+                            const li = document.createElement('li');
+                            li.className = 'news-item';
+                            
+                            const title = cleanHtml(item.title);
+                            const description = cleanHtml(item.description);
+                            const pubDate = formatNewsDate(item.pubDate); 
+                            
+                            li.innerHTML = `
+                                <a href="${item.link}" target="_blank">${title}</a>
+                                <div class="description">${description}</div>
+                                <div class="date">${pubDate}</div>
+                            `;
+                            resultsContainer.appendChild(li);
+                        });
+                    } else {
+                        errorMessage.textContent = `"${keyword}"에 대한 검색 결과가 없습니다.`;
+                    }
+                } else {
+                    const errorMsg = data.error || `서버 오류 발생 (${response.status_code})`;
+                    errorMessage.textContent = errorMsg;
+                }
+
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                errorMessage.textContent = `오류 발생: ${error.name}: ${error.message}. 서버의 URL(/api/search_news/)과 응답 형식을 확인해 주세요.`;
+            } finally {
+                loadingMessage.style.display = 'none';
+            }
         }
     </script>
 </body>

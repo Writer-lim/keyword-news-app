@@ -2,299 +2,63 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>바둑 게임 (19x19) ⚫⚪</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>바둑 게임</title>
     <style>
-        body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
-        .container { max-width: 800px; margin: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        h1 { text-align: center; color: #333; }
-        #nav a { margin: 0 10px; text-decoration: none; color: #007bff; }
-        
-        #controls { margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; }
-        #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
-        #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
-
-        /* 바둑판 전체 래퍼: 19x19 보드 (18개 간격 * 30px = 540px + 패딩 30px) */
-        #board-wrapper {
-            position: relative;
-            width: 570px; /* 초기값 */
-            height: 570px; /* 초기값 */
-            padding: 15px; 
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 50px 0;
+        }
+        .container {
+            max-width: 700px;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+        .board-placeholder {
+            width: 100%;
+            aspect-ratio: 1 / 1;
             background-color: #e3b772;
-            border: 1px solid #000; 
-            user-select: none;
-        }
-        
-        /* 라인 및 교차점 영역 (패딩 15px만큼 이동, 540x540 영역) */
-        #lines, #intersections {
-            position: absolute;
-            top: 15px; 
-            left: 15px;
-            width: 540px; 
-            height: 540px;
-        }
-        
-        /* 선: 두께 통일 */
-        .line-h, .line-v {
-            position: absolute;
-            background-color: #000;
-        }
-        .line-h { height: 1px; left: 0; right: 0; transform: translateY(-0.5px); }
-        .line-v { width: 1px; top: 0; bottom: 0; transform: translateX(-0.5px); }
-        
-        .intersection {
-            position: absolute;
-            cursor: pointer;
-            z-index: 10;
-        }
-        
-        .stone {
-            border-radius: 50%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .black { background-color: black; z-index: 20; }
-        .white { background-color: white; border: 1px solid #333; z-index: 20; }
-        
-        #status { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-
-        /* 모바일 최적화 */
-        @media (max-width: 600px) {
-             .container { padding: 10px; }
-             #board-wrapper { 
-                 max-width: 95vw;
-                 height: calc(95vw); /* 정사각형 유지 */
-                 width: calc(95vw);
-                 padding: 15px;
-             }
-             /* Lines와 Intersections는 wrapper 크기에 맞춰 동적 조정 (JS 처리) */
+            border: 2px solid #000;
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            color: #555;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="nav" style="text-align: center; margin-bottom: 20px;">
+        <div class="nav-links">
             <a href="/">메인 페이지로 돌아가기</a>
         </div>
-        <h1>바둑 게임 (19x19) ⚫⚪</h1>
-        
-        <div id="controls">
-            <div style="margin-bottom: 10px;">
-                <button id="mode-user-ai" data-mode="user-ai" class="active">사용자 vs AI</button>
-                <button id="mode-ai-ai" data-mode="ai-ai">AI vs AI</button>
-            </div>
-            
-            <div>
-                <label for="difficulty">AI 난이도:</label>
-                <select id="difficulty">
-                    <option value="1">하수 (랜덤)</option>
-                    <option value="1" selected>중수 (랜덤)</option>
-                    <option value="1">고수 (랜덤)</option>
-                </select>
-                <button onclick="startGame()">새 게임 시작</button>
-                <button onclick="passTurn()">패스</button>
-            </div>
+        <h1>바둑 게임 (19줄)</h1>
+        <p>※ 이 페이지는 현재 UI만 구성되어 있으며, 게임 로직은 아직 구현되지 않았습니다.</p>
+        <div class="board-placeholder">
+            바둑판 영역
         </div>
-
-        <div id="board-wrapper">
-            <div id="lines"></div>
-            <div id="intersections"></div>
-        </div>
-        
-        <div id="status">흑돌 차례입니다.</div>
+        <p style="margin-top: 20px; font-weight: bold;">흑돌 차례입니다.</p>
     </div>
-
-    <script>
-        const intersectionsElement = document.getElementById('intersections');
-        const linesElement = document.getElementById('lines');
-        const statusElement = document.getElementById('status');
-        const boardWrapper = document.getElementById('board-wrapper');
-        const modeButtons = document.querySelectorAll('#controls button[data-mode]');
-        
-        const BOARD_SIZE = 19; 
-        let CELL_SIZE = 30; 
-
-        let board = [];
-        let currentPlayer = 1; 
-        let gameOver = false;
-        let currentMode = 'user-ai';
-
-        window.addEventListener('resize', initializeBoard); 
-        
-        // -- 초기화 및 UI 로직 (정렬 문제 해결) --
-
-        function initializeBoard() {
-             // 동적으로 CELL_SIZE 계산: 19x19는 18개의 간격
-             const linesContainerWidth = boardWrapper.clientWidth - 30; // wrapperWidth - padding (15*2)
-             CELL_SIZE = linesContainerWidth / (BOARD_SIZE - 1);
-            
-             // Lines 및 Intersections 컨테이너 크기 설정
-             const linesSize = (BOARD_SIZE - 1) * CELL_SIZE;
-             linesElement.style.width = `${linesSize}px`;
-             linesElement.style.height = `${linesSize}px`;
-             intersectionsElement.style.width = `${linesSize}px`;
-             intersectionsElement.style.height = `${linesSize}px`;
-
-            board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
-            linesElement.innerHTML = '';
-            intersectionsElement.innerHTML = '';
-
-            // 1. 선 그리기 (Lines)
-            for (let i = 0; i < BOARD_SIZE; i++) {
-                // 가로선
-                const hLine = document.createElement('div');
-                hLine.className = 'line-h';
-                hLine.style.top = `${i * CELL_SIZE}px`; 
-                linesElement.appendChild(hLine);
-
-                // 세로선
-                const vLine = document.createElement('div');
-                vLine.className = 'line-v';
-                vLine.style.left = `${i * CELL_SIZE}px`; 
-                linesElement.appendChild(vLine);
-            }
-
-            // 2. 교차점 영역 추가 및 이벤트 리스너 설정
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                for (let c = 0; c < BOARD_SIZE; c++) {
-                    const intersection = document.createElement('div');
-                    intersection.className = 'intersection';
-                    
-                    // 위치와 크기를 동적으로 설정
-                    intersection.style.top = `${r * CELL_SIZE}px`;
-                    intersection.style.left = `${c * CELL_SIZE}px`;
-                    intersection.style.width = `${CELL_SIZE}px`;
-                    intersection.style.height = `${CELL_SIZE}px`;
-
-                    intersection.dataset.row = r;
-                    intersection.dataset.col = c;
-                    intersection.addEventListener('click', handleMove);
-                    intersectionsElement.appendChild(intersection);
-                }
-            }
-            statusElement.textContent = '흑돌 차례입니다.';
-            gameOver = false;
-        }
-
-        modeButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                modeButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                currentMode = button.dataset.mode;
-                startGame();
-            });
-        });
-
-        function startGame() {
-            currentPlayer = 1; 
-            initializeBoard();
-            statusElement.textContent = '흑돌 차례입니다.';
-            
-            if (currentMode === 'ai-ai') {
-                runAIGame();
-            }
-        }
-
-        // -- 게임 흐름 및 규칙 로직 (팝업 추가) --
-        
-        function handleMove(event) {
-            if (gameOver || currentMode !== 'user-ai' || currentPlayer !== 1) return; 
-
-            const r = parseInt(event.target.dataset.row);
-            const c = parseInt(event.target.dataset.col);
-
-            if (board[r][c] === 0) {
-                // **[요청 6] 착수 확인 팝업 추가**
-                if (!confirm(`(${r}, ${c}) 위치에 흑돌을 놓으시겠습니까?`)) {
-                    return; // 사용자가 취소하면 착수 안 함
-                }
-
-                if (tryMove(r, c, 1)) {
-                    // AI 턴으로 전환
-                    statusElement.textContent = '백돌 (AI)이 생각 중...';
-                    setTimeout(makeAIMove, 500); 
-                }
-            }
-        }
-        
-        function tryMove(r, c, player, isAI = false) {
-            // ... (기존 tryMove 로직 유지) ...
-            
-            // 1. 임시 착수 및 보드 복사
-            const tempBoard = board.map(row => [...row]);
-            tempBoard[r][c] = player;
-            
-            // 2. 따낸 돌 확인 (tempBoard 기준)
-            const stonesToRemove = checkCaptures(r, c, player, tempBoard);
-
-            if (stonesToRemove.length > 0) {
-                // 따낸 돌이 있으면, tempBoard에서 제거
-                stonesToRemove.forEach(([tr, tc]) => tempBoard[tr][tc] = 0);
-                
-                // 최종 보드 업데이트 및 착수 완료
-                board = tempBoard;
-                finalizeMove(r, c, player, stonesToRemove);
-                return true;
-
-            } else {
-                 // 3. 따낸 돌이 없으면 자살 수 검사
-                 if (!hasLiberty(r, c, tempBoard)) {
-                    // 자살 수!
-                    if (!isAI) alert("자살 금지 (따내는 돌이 없는데 놓으면 안 됩니다)!");
-                    return false;
-                 } else {
-                    // 자살 수가 아니면 정상 착수
-                    board = tempBoard;
-                    finalizeMove(r, c, player, []);
-                    return true;
-                 }
-            }
-        }
-        
-        function finalizeMove(r, c, player, stonesRemoved) {
-            drawStoneOnUI(r, c, player);
-            removeStones(stonesRemoved); // 따낸 돌 UI에서 제거
-            
-            // 턴 변경
-            currentPlayer = player === 1 ? 2 : 1;
-            
-            // 턴 상태 UI 업데이트
-            if (currentMode !== 'ai-ai') {
-                 statusElement.textContent = `${currentPlayer === 1 ? '흑돌' : '백돌 (AI)'} 차례입니다.`;
-            }
-        }
-
-        function drawStoneOnUI(r, c, player) {
-            const index = r * BOARD_SIZE + c;
-            const intersection = intersectionsElement.children[index];
-            if (intersection && intersection.children.length === 0) {
-                const stone = document.createElement('div');
-                stone.className = `stone ${player === 1 ? 'black' : 'white'}`;
-                
-                // 돌 크기를 동적으로 설정
-                stone.style.width = `${CELL_SIZE * 0.9}px`;
-                stone.style.height = `${CELL_SIZE * 0.9}px`;
-
-                intersection.appendChild(stone);
-            }
-        }
-        
-        // ... (나머지 removeStones, passTurn, runAIGame, makeAIMove 함수 유지) ...
-        // ... (hasLiberty, checkCaptures, getGroup 함수 유지) ...
-        
-        // --- (나머지 바둑 로직 함수들) ---
-        function removeStones(stonesToRemove) { /* ... */ }
-        function passTurn() { /* ... */ }
-        function runAIGame() { /* ... */ }
-        function makeAIMove(isAIVsAI = false) { /* ... */ }
-        function hasLiberty(r, c, currentBoard) { /* ... */ return false; }
-        function checkCaptures(r, c, player, currentBoard) { /* ... */ return []; }
-        function getGroup(r, c, currentBoard, player) { /* ... */ return []; }
-
-
-        window.onload = initializeBoard;
-    </script>
 </body>
 </html>
