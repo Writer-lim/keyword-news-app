@@ -6,10 +6,13 @@ from flask import Flask, render_template, request, jsonify
 # Flask 애플리케이션 인스턴스 생성
 app = Flask(__name__)
 
-# --- API 키 및 기본 설정 (실제 키로 대체 필요) ---
-# 🚨🚨🚨 발급받은 실제 Client ID와 Secret으로 교체해야 합니다! 🚨🚨🚨
-NAVER_CLIENT_ID = "AgwStYnlHOuNUOOn7kiD" # 실제 ID로 대체하세요
-NAVER_CLIENT_SECRET = "_ZBcX8Ec50" # 실제 Secret으로 대체하세요
+# --- API 키 및 기본 설정 ---
+# 🚨🚨🚨 실제 Client ID와 Secret으로 교체되어야 합니다! 🚨🚨🚨
+NAVER_CLIENT_ID = "AgwStYnlHOuNUOOn7kiD" 
+NAVER_CLIENT_SECRET = "_ZBcX8Ec50" 
+
+# 🚨🚨🚨 최종 적용된 YouTube Data API Key 🚨🚨🚨
+YOUTUBE_API_KEY = "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGh2sPSM"
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
@@ -34,13 +37,10 @@ def baduk_view():
     return render_template('baduk.html')
 
 
-# --- 2. 뉴스 검색 API 라우팅 (뉴스 검색 로직) ---
+# --- 2. 뉴스 검색 API 라우팅 ---
 
 @app.route('/api/search_news/', methods=['POST'])
 def search_news():
-    """
-    키워드를 받아 네이버 뉴스 검색 API를 호출하고 결과를 JSON 형태로 반환합니다.
-    """
     if request.method == 'POST':
         try:
             data = request.get_json()
@@ -76,13 +76,10 @@ def search_news():
 
     return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
-# --- 3. 이미지 검색 API 라우팅 (이미지 검색 로직) ---
+# --- 3. 이미지 검색 API 라우팅 ---
 
 @app.route('/api/search_image/', methods=['POST'])
 def search_image():
-    """
-    키워드를 받아 네이버 이미지 검색 API를 호출하고 결과를 JSON 형태로 반환합니다.
-    """
     if request.method == 'POST':
         try:
             data = request.get_json()
@@ -98,7 +95,7 @@ def search_image():
             url = "https://openapi.naver.com/v1/search/image" 
             params = {
                 'query': keyword,
-                'display': 5,  # 이미지 5개만 표시
+                'display': 5,
                 'sort': 'sim'
             }
 
@@ -118,6 +115,53 @@ def search_image():
 
     return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
+# --- 4. 유튜브 검색 API 라우팅 ---
+
+@app.route('/api/search_youtube/', methods=['POST'])
+def search_youtube():
+    """
+    키워드를 받아 YouTube Data API를 호출하고 결과를 JSON 형태로 반환합니다.
+    """
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            keyword = data.get('keyword', '')
+            
+            if not keyword:
+                return jsonify({'error': '키워드가 필요합니다.'}), 400
+            
+            if YOUTUBE_API_KEY == "YOUR_YOUTUBE_API_KEY":
+                return jsonify({
+                    'error': "YouTube API Key가 설정되지 않았습니다. app.py 파일의 YOUTUBE_API_KEY를 실제 키로 교체해 주십시오."
+                }), 403 # Forbidden
+
+            # YouTube API 호출 설정
+            url = "https://www.googleapis.com/youtube/v3/search"
+            params = {
+                'part': 'snippet',
+                'q': keyword,
+                'key': YOUTUBE_API_KEY,
+                'type': 'video',
+                'maxResults': 5  # 영상 5개만 표시
+            }
+
+            response = requests.get(url, params=params)
+            
+            if response.status_code == 200:
+                return jsonify(response.json())
+            else:
+                # YouTube API 오류 상세 정보 전달
+                error_detail = response.json().get('error', {}).get('message', '알 수 없는 오류')
+                return jsonify({
+                    'error': f"YouTube API 호출 오류: {response.status_code}",
+                    'detail': error_detail
+                }), response.status_code
+
+        except Exception as e:
+            print(f"Youtube Server Error: {e}")
+            return jsonify({'error': f'서버 내부 오류: {str(e)}'}), 500
+
+    return jsonify({'error': 'POST 요청만 허용됩니다.'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
