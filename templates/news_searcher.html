@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>키워드 뉴스 검색기</title>
+    <title>키워드 통합 검색기</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -15,7 +15,7 @@
         }
         .container {
             width: 100%;
-            max-width: 900px; /* 전체 컨테이너 폭 확장 */
+            max-width: 1200px; /* 전체 컨테이너 폭 확장 */
             padding: 30px;
             background: white;
             border-radius: 12px;
@@ -73,7 +73,7 @@
             margin-top: 20px;
         }
         .news-section {
-            flex: 2; /* 뉴스 섹션이 더 넓게 */
+            flex: 3; /* 뉴스 섹션이 가장 넓게 */
             min-width: 0; 
         }
         #news-results {
@@ -84,9 +84,6 @@
             border-bottom: 1px solid #eee;
             padding: 15px 0;
         }
-        .news-item:last-child {
-            border-bottom: none;
-        }
         .news-item a {
             font-size: 18px;
             color: #007bff;
@@ -95,36 +92,32 @@
             display: block;
             margin-bottom: 5px;
         }
-        .news-item a:hover {
-            text-decoration: underline;
+        .news-item .description { color: #555; font-size: 14px; }
+
+        /* 이미지/유튜브 섹션 컨테이너 */
+        .side-content {
+            flex: 2; /* 이미지와 유튜브 섹션 */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
-        .news-item .description {
-            color: #555;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-        .news-item .date {
-            font-size: 12px;
-            color: #888;
-        }
-        /* 이미지 섹션 스타일 */
-        .image-section {
-            flex: 1; /* 이미지 섹션은 상대적으로 좁게 */
+        .side-box {
             padding: 15px;
             background-color: #f9f9f9;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
-        .image-section h3 {
+        .side-box h3 {
             text-align: center;
             color: #555;
             margin-top: 0;
             margin-bottom: 15px;
             font-size: 16px;
         }
+        /* 이미지 갤러리 */
         .image-gallery {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2열 배치 */
+            grid-template-columns: repeat(2, 1fr); 
             gap: 10px;
         }
         .image-item img {
@@ -134,6 +127,33 @@
             object-fit: cover; /* 이미지가 잘리지 않고 채우도록 설정 */
             display: block;
         }
+        /* 유튜브 영상 목록 */
+        .youtube-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .youtube-item img {
+            width: 100px;
+            height: 56px; /* 16:9 비율 유지 */
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .youtube-info a {
+            font-size: 14px;
+            font-weight: bold;
+            color: #CC0000; /* 유튜브 레드 */
+            text-decoration: none;
+            display: block;
+            margin-bottom: 3px;
+        }
+        .youtube-info .channel-title {
+            font-size: 12px;
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -141,7 +161,7 @@
         <div class="nav-links">
             <a href="/">메인 페이지로 돌아가기</a>
         </div>
-        <h1>키워드 뉴스 & 이미지 검색기 📰🖼️</h1>
+        <h1>키워드 뉴스 & 이미지 & 유튜브 통합 검색기 📰🖼️▶️</h1>
         
         <div id="search-form">
             <input type="text" id="keyword" placeholder="검색할 키워드를 입력하세요" value="코인">
@@ -153,15 +173,25 @@
 
         <div class="content-wrapper">
             <div class="news-section">
+                <h2>뉴스 검색 결과</h2>
                 <ul id="news-results">
                     </ul>
             </div>
             
-            <div class="image-section" id="image-section">
-                <h3>관련 이미지</h3>
-                <div class="image-gallery" id="image-gallery">
-                    </div>
-                <div id="image-error-message" style="color: gray; text-align: center; font-size: 12px;"></div>
+            <div class="side-content">
+                <div class="side-box" id="image-section">
+                    <h3>관련 이미지</h3>
+                    <div class="image-gallery" id="image-gallery">
+                        </div>
+                    <div id="image-error-message" style="color: gray; text-align: center; font-size: 12px;"></div>
+                </div>
+
+                <div class="side-box" id="youtube-section">
+                    <h3>관련 유튜브 영상</h3>
+                    <div id="youtube-results">
+                        </div>
+                    <div id="youtube-error-message" style="color: gray; text-align: center; font-size: 12px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -169,11 +199,20 @@
     <script>
         const keywordInput = document.getElementById('keyword');
         const searchButton = document.getElementById('search-button');
+        const loadingMessage = document.getElementById('loading');
+        
+        // 뉴스 영역
         const resultsContainer = document.getElementById('news-results');
         const errorMessage = document.getElementById('error-message');
+        
+        // 이미지 영역
         const imageGallery = document.getElementById('image-gallery');
         const imageErrorMessage = document.getElementById('image-error-message');
-        const loadingMessage = document.getElementById('loading');
+        
+        // 유튜브 영역
+        const youtubeResults = document.getElementById('youtube-results');
+        const youtubeErrorMessage = document.getElementById('youtube-error-message');
+
 
         searchButton.addEventListener('click', searchAll);
         keywordInput.addEventListener('keypress', (e) => {
@@ -187,16 +226,11 @@
         }
 
         function formatNewsDate(dateString) {
-            // 날짜 포맷팅 로직은 그대로 유지
             if (dateString) {
-                // 네이버 API는 pubDate를 RFC 5322 형식으로 반환 (예: Mon, 16 Dec 2024 09:00:00 +0900)
                 try {
                     const date = new Date(dateString);
-                    return date.toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                    }) + ' ' + date.toLocaleTimeString('ko-KR');
+                    return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) 
+                           + ' ' + date.toLocaleTimeString('ko-KR');
                 } catch (e) {
                     return dateString;
                 }
@@ -205,7 +239,7 @@
         }
 
         // -----------------------------------------------------
-        // 1. 뉴스 검색 로직 (별도 함수)
+        // 1. 뉴스 검색 로직
         // -----------------------------------------------------
         async function searchNews(keyword) {
             const response = await fetch('/api/search_news/', {
@@ -243,7 +277,7 @@
         }
 
         // -----------------------------------------------------
-        // 2. 이미지 검색 로직 (별도 함수)
+        // 2. 이미지 검색 로직
         // -----------------------------------------------------
         async function searchImage(keyword) {
             const response = await fetch('/api/search_image/', {
@@ -259,7 +293,6 @@
                     data.items.forEach(item => {
                         const itemDiv = document.createElement('div');
                         itemDiv.className = 'image-item';
-                        // thumbnail 대신 sizeheight, sizewidth가 없는 경우 'link' 사용
                         const imageUrl = item.thumbnail || item.link; 
                         
                         itemDiv.innerHTML = `<a href="${item.link}" target="_blank"><img src="${imageUrl}" alt="${cleanHtml(item.title)}"></a>`;
@@ -274,9 +307,53 @@
             }
         }
 
+        // -----------------------------------------------------
+        // 3. 유튜브 검색 로직 (새로 추가)
+        // -----------------------------------------------------
+        async function searchYoutube(keyword) {
+            const response = await fetch('/api/search_youtube/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyword: keyword })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(item => {
+                        // YouTube Data API 결과 구조에 맞게 파싱
+                        const videoId = item.id.videoId;
+                        const snippet = item.snippet;
+                        
+                        if (videoId && snippet) {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'youtube-item';
+                            
+                            itemDiv.innerHTML = `
+                                <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
+                                    <img src="${snippet.thumbnails.medium.url}" alt="${snippet.title}">
+                                </a>
+                                <div class="youtube-info">
+                                    <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">${snippet.title}</a>
+                                    <div class="channel-title">${snippet.channelTitle}</div>
+                                </div>
+                            `;
+                            youtubeResults.appendChild(itemDiv);
+                        }
+                    });
+                } else {
+                    youtubeErrorMessage.textContent = `유튜브 영상 결과 없음.`;
+                }
+            } else {
+                const errorMsg = data.error || `유튜브 서버 오류 발생 (${response.status_code})`;
+                youtubeErrorMessage.textContent = errorMsg;
+            }
+        }
+
 
         // -----------------------------------------------------
-        // 3. 통합 검색 실행 함수 (두 API를 동시에 실행)
+        // 4. 통합 검색 실행 함수 (모든 API를 동시에 실행)
         // -----------------------------------------------------
         async function searchAll() {
             const keyword = keywordInput.value.trim();
@@ -288,15 +365,18 @@
             // 상태 초기화
             errorMessage.textContent = '';
             imageErrorMessage.textContent = '';
+            youtubeErrorMessage.textContent = '';
             resultsContainer.innerHTML = '';
             imageGallery.innerHTML = '';
+            youtubeResults.innerHTML = '';
             loadingMessage.style.display = 'block';
 
             try {
-                // Promise.all을 사용하여 뉴스 검색과 이미지 검색을 동시에 실행 (속도 향상)
+                // Promise.all을 사용하여 뉴스, 이미지, 유튜브 검색을 동시에 실행
                 await Promise.all([
                     searchNews(keyword),
-                    searchImage(keyword)
+                    searchImage(keyword),
+                    searchYoutube(keyword) // 유튜브 검색 추가
                 ]);
 
             } catch (error) {
