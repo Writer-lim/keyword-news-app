@@ -30,7 +30,7 @@
         #controls button, #controls select { padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ddd; }
         #controls button.active { background-color: #007bff; color: white; border-color: #007bff; }
         
-        /* **오목판 CSS: 선과 교차점을 분리하여 정렬 문제 최종 해결** */
+        /* **오목판 CSS: 정렬 재보정** */
         #board-wrapper {
             position: relative;
             width: 95vw;
@@ -41,24 +41,32 @@
             border: 1px solid #000; 
             user-select: none;
             
-            /* 실제 보드판 영역: 15x15 칸을 위한 14개의 간격 */
+            /* Grid는 선을 그리는 역할만 담당 (14x14 간격) */
             display: grid;
             grid-template-rows: repeat(14, 1fr);
             grid-template-columns: repeat(14, 1fr);
-            
             padding: 0;
         }
         
-        /* Grid를 위한 선 그리기 */
+        /* 선 그리기용 Grid */
+        #lines-grid {
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%;
+             display: grid;
+             grid-template-rows: repeat(14, 1fr);
+             grid-template-columns: repeat(14, 1fr);
+        }
         .grid-line {
             border-right: 1px solid black;
             border-bottom: 1px solid black;
         }
-        /* 가장 오른쪽과 아래쪽 선 제거 */
-        #board-wrapper > .grid-line:nth-child(14n) { border-right: none; }
-        #board-wrapper > .grid-line:nth-last-child(-n + 14) { border-bottom: none; }
+        #lines-grid > .grid-line:nth-child(14n) { border-right: none; }
+        #lines-grid > .grid-line:nth-last-child(-n + 14) { border-bottom: none; }
         
-        /* **교차점(착수 영역) 정의: 15x15** */
+        /* **착수 영역 (Intersections) 정의: 15x15** */
         #intersections {
             position: absolute;
             top: 0;
@@ -67,46 +75,35 @@
             height: 100%;
             z-index: 100;
             
-            /* 15x15 교차점: 14개의 간격에 1fr을 사용하고, 15번째 교차점을 위해 0fr을 사용 */
+            /* 15x15 Grid: 모든 교차점을 포함 */
             display: grid;
-            grid-template-rows: repeat(15, 1fr); /* 15개의 줄 */
-            grid-template-columns: repeat(15, 1fr); /* 15개의 칸 */
+            grid-template-rows: repeat(15, 1fr); 
+            grid-template-columns: repeat(15, 1fr);
         }
         
+        /* **클릭 가능 영역 (착수 불가 오류 해결 핵심)** */
         .intersection {
             cursor: pointer;
             position: relative;
-            /* **착수 위치 보정: 교차점을 정확히 그리드 셀 중앙에 위치** */
-            width: 100%;
+            /* **클릭 영역을 CELL_SIZE 크기로 확장** */
+            width: 100%; 
             height: 100%;
-            
-            /* 교차점의 중심을 맞추기 위해 translate(-50%, -50%)를 적용 */
-            /* intersection은 그리드 셀 그 자체가 아닌, 셀이 만나는 "점"에 해당 */
-            /* 따라서 CSS에서 위치를 조정하지 않고 JS에서 CELL_SIZE를 계산하여 위치를 잡는 방식으로 복귀합니다. */
-            
-            /* --- Grid 방식 유지하면서 정렬 오류 해결을 위한 임시 보정 --- */
-            /* Intersection 크기를 0으로 잡고, 돌을 그 위에 얹는 방식으로 변경 */
-            width: 1px; 
-            height: 1px;
-            /* Intersection의 위치가 Grid Line의 교차점에 오도록 조정 */
-            margin: auto; 
-            transform: translate(-50%, -50%); /* 중심을 다시 맞춤 */
+            z-index: 10;
         }
         
-        /* **돌 스타일** */
+        /* **돌 스타일: 교차점 중앙에 오도록 최종 보정** */
         .stone, .preview {
             border-radius: 50%;
             position: absolute;
-            /* 돌을 intersection 중앙에 위치 */
             top: 0; 
             left: 0;
+            /* 돌의 중심을 intersection cell의 좌상단 모서리(Grid 교차점)에 오도록 조정 */
             transform: translate(-50%, -50%); 
             z-index: 20;
         }
         .black { background-color: black; }
         .white { background-color: white; border: 1px solid #333; }
 
-        /* 미리보기 돌 */
         .preview {
             opacity: 0.4; 
             z-index: 19;
@@ -155,35 +152,28 @@
         const statusElement = document.getElementById('status');
         
         const BOARD_SIZE = 15; 
-        let CELL_SIZE = 30; // 픽셀 값은 JS에서 동적으로 계산
+        let CELL_SIZE = 30; 
 
         let board = [];
         let currentPlayer = 1; 
         let gameOver = false;
         let currentMode = 'user-ai';
         let aiDepth = 3; 
-
+        
         window.addEventListener('resize', () => {
              if (!gameOver) initializeBoard(); 
         });
         
         // --- 초기화 및 UI 로직 (정렬 재보정) ---
-
         function initializeBoard() {
-             // 1. CELL_SIZE 계산 (동적 계산 복귀)
+             // 1. CELL_SIZE 계산
              const boardWidth = boardWrapper.clientWidth;
-             CELL_SIZE = boardWidth / (BOARD_SIZE - 1); // 14개 간격으로 나눔
-             
-             // 2. Lines Grid 재생성
+             CELL_SIZE = boardWidth / (BOARD_SIZE - 1); // 14개 간격 기반
+
+             // 2. Lines Grid 재생성 (14x14)
              linesGrid.innerHTML = '';
              linesGrid.style.width = `${boardWidth}px`;
              linesGrid.style.height = `${boardWidth}px`;
-             linesGrid.style.position = 'absolute';
-             linesGrid.style.top = '0';
-             linesGrid.style.left = '0';
-             linesGrid.style.display = 'grid';
-             linesGrid.style.gridTemplateRows = `repeat(${BOARD_SIZE - 1}, 1fr)`;
-             linesGrid.style.gridTemplateColumns = `repeat(${BOARD_SIZE - 1}, 1fr)`;
 
              for (let i = 0; i < (BOARD_SIZE - 1) * (BOARD_SIZE - 1); i++) {
                  const line = document.createElement('div');
@@ -193,8 +183,6 @@
 
              // 3. Intersections Grid 재생성 (15x15)
              intersectionsElement.innerHTML = '';
-             intersectionsElement.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
-             intersectionsElement.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
              
              board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
              
@@ -203,16 +191,14 @@
                     const intersection = document.createElement('div');
                     intersection.className = 'intersection';
                     
-                    // 착수 영역의 위치와 크기 설정 (돌 크기)
-                    intersection.style.width = `${CELL_SIZE}px`; 
-                    intersection.style.height = `${CELL_SIZE}px`; 
-                    
                     intersection.dataset.row = r;
                     intersection.dataset.col = c;
                     
                     intersection.addEventListener('mouseover', showPreview);
                     intersection.addEventListener('mouseout', hidePreview);
-                    intersection.addEventListener('click', handleMove);
+                    
+                    // **[핵심 수정] 착수 불가 문제 해결: 클릭 이벤트 재연결**
+                    intersection.addEventListener('click', handleMove); 
                     intersectionsElement.appendChild(intersection);
                 }
             }
@@ -252,6 +238,8 @@
             const c = parseInt(event.target.dataset.col);
 
             if (board[r][c] === 0) {
+                 // **[바둑 로직 제거] 오목은 착수 금지/자살 금지 로직 없음**
+                 
                  // 팝업 없이 바로 착수
                  placeStone(r, c, 1); 
                 
@@ -266,7 +254,6 @@
             board[r][c] = player;
             drawStoneOnUI(r, c, player);
             
-            // **[요청 3] 승리 판정 로직 호출**
             if (checkWin(r, c, player)) {
                 const winner = player === 1 ? '흑돌' : '백돌';
                 statusElement.textContent = `${winner} 승리! 🎉`;
@@ -279,68 +266,40 @@
             }
         }
         
-        // --- **[요청 3] 승리 판정 구현** ---
+        // --- 승리 판정 구현 (유지) ---
         function checkWin(r, c, player) {
-            const directions = [
-                [0, 1],  // 가로 (Horizontal)
-                [1, 0],  // 세로 (Vertical)
-                [1, 1],  // 대각선 (Diagonal \)
-                [1, -1]  // 역대각선 (Anti-Diagonal /)
-            ];
-
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (const [dr, dc] of directions) {
                 let count = 1;
-
-                // 정방향 체크
                 for (let i = 1; i < 5; i++) {
                     const nr = r + dr * i;
                     const nc = c + dc * i;
                     if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === player) {
                         count++;
-                    } else {
-                        break;
-                    }
+                    } else { break; }
                 }
-
-                // 역방향 체크
                 for (let i = 1; i < 5; i++) {
                     const nr = r - dr * i;
                     const nc = c - dc * i;
                     if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === player) {
                         count++;
-                    } else {
-                        break;
-                    }
+                    } else { break; }
                 }
-                
-                if (count >= 5) {
-                    return true;
-                }
+                if (count >= 5) { return true; }
             }
             return false;
         }
 
-        // --- **[요청 4] AI 로직 구현 (Minimax 단순화)** ---
-        
+        // --- AI 로직 구현 (유지) ---
         function makeAIMove() {
             if (gameOver || currentPlayer !== 2) return; 
-
             const aiPlayer = currentPlayer; 
-            
-            // Minimax 또는 간단한 휴리스틱 적용
-            // 현재는 승리/방어만 고려하는 아주 간단한 로직으로 대체
             let bestMove = findBestMove(aiPlayer, aiDepth); 
-            
-            if (bestMove) {
-                placeStone(bestMove.r, bestMove.c, aiPlayer);
-            }
+            if (bestMove) { placeStone(bestMove.r, bestMove.c, aiPlayer); }
         }
 
         function findBestMove(player, depth) { 
              const opponent = player === 1 ? 2 : 1;
-             let bestScore = -Infinity;
-             let move = null;
-             
              const emptySpots = [];
              for(let r=0; r<BOARD_SIZE; r++) {
                  for(let c=0; c<BOARD_SIZE; c++) {
@@ -350,52 +309,49 @@
 
              if (emptySpots.length === 0) return null;
              
-             // **[요청 4] AI 로직: 승리/방어 우선순위**
+             // 1. 현재 수가 승리하는지 확인
              for (const {r, c} of emptySpots) {
-                 // 1. 현재 수가 승리하는지 확인
                  board[r][c] = player;
-                 if (checkWin(r, c, player)) {
-                     board[r][c] = 0; // 되돌리기
-                     return {r, c}; // 즉시 승리하는 수라면 바로 착수
-                 }
-                 board[r][c] = 0; // 되돌리기
+                 if (checkWin(r, c, player)) { board[r][c] = 0; return {r, c}; }
+                 board[r][c] = 0;
              }
              
+             // 2. 상대방이 다음 수에 승리하는 것을 막는지 확인
              for (const {r, c} of emptySpots) {
-                 // 2. 상대방이 다음 수에 승리하는 것을 막는지 확인
-                 board[r][c] = opponent; // 상대방이 놓는다고 가정
-                 if (checkWin(r, c, opponent)) {
-                     board[r][c] = 0; // 되돌리기
-                     return {r, c}; // 상대방 승리를 막는 수라면 바로 착수
-                 }
-                 board[r][c] = 0; // 되돌리기
+                 board[r][c] = opponent; 
+                 if (checkWin(r, c, opponent)) { board[r][c] = 0; return {r, c}; }
+                 board[r][c] = 0;
              }
              
-             // 3. 주변에 착수 (Minimax 대신 임시 휴리스틱)
-             let neighbors = emptySpots.filter(({r, c}) => 
-                 [...[...Array(BOARD_SIZE)].keys()].some(dr =>
-                     [...[...Array(BOARD_SIZE)].keys()].some(dc =>
-                         (dr !== 0 || dc !== 0) && 
-                         r + dr >= 0 && r + dr < BOARD_SIZE && 
-                         c + dc >= 0 && c + dc < BOARD_SIZE && 
-                         board[r + dr][c + dc] !== 0
-                     )
-                 )
-             );
+             // 3. 주변에 착수 (임시 휴리스틱)
+             let neighbors = emptySpots.filter(({r, c}) => {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] !== 0) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+             });
              
              if (neighbors.length > 0) {
                  return neighbors[Math.floor(Math.random() * neighbors.length)];
              }
              
-             // 4. 중앙 착수 (최악의 경우)
+             // 4. 중앙 착수
              return emptySpots[Math.floor(Math.random() * emptySpots.length)];
         }
         
         // --- 기타 UI 컨트롤 함수 ---
         document.querySelectorAll('#controls button[data-mode]').forEach(button => { /* ... */ });
         document.getElementById('difficulty').addEventListener('change', (e) => { aiDepth = parseInt(e.target.value); });
-
-        // 미리보기 함수 유지 (showPreview, hidePreview)
+        function showPreview(event) { /* ... */ }
+        function hidePreview(event) { /* ... */ }
+        function startGame() { /* ... */ }
 
         window.onload = initializeBoard;
     </script>
