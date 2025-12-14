@@ -12,7 +12,7 @@ NAVER_CLIENT_ID = "AgwStYnlHOuNUOOn7kiD"
 NAVER_CLIENT_SECRET = "_ZBcX8Ec50" 
 
 # 🚨🚨🚨 최종 적용된 YouTube Data API Key 🚨🚨🚨
-YOUTUBE_API_KEY = "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGh2sPSM"
+YOUTUBE_API_KEY = "AIzaSyAM7Sc6RxrYBr_uSFcbSp8tuUGg9h2sPSM"
 
 
 # --- 1. UI 라우팅 (페이지 렌더링) ---
@@ -130,6 +130,7 @@ def search_youtube():
             if not keyword:
                 return jsonify({'error': '키워드가 필요합니다.'}), 400
             
+            # API 키가 설정되지 않은 경우를 대비한 가드
             if YOUTUBE_API_KEY == "YOUR_YOUTUBE_API_KEY":
                 return jsonify({
                     'error': "YouTube API Key가 설정되지 않았습니다. app.py 파일의 YOUTUBE_API_KEY를 실제 키로 교체해 주십시오."
