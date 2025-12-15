@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>틱택토 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8; /* Light Blue Gray */
+        }
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 300px;
+            height: 300px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .cell {
+            border: 4px solid #334155; /* Slate-700 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            user-select: none;
+            font-weight: 700;
+        }
+        .cell:hover:not(.occupied) {
+            background-color: #e2e8f0; /* Slate-200 */
+        }
+        .cell:nth-child(3n) { border-right: none; }
+        .cell:nth-child(n+7) { border-bottom: none; }
+        .cell:nth-child(1), .cell:nth-child(4), .cell:nth-child(7) { border-left: none; }
+        .cell:nth-child(-n+3) { border-top: none; }
+
+        .x-color { color: #ef4444; } /* Red */
+        .o-color { color: #3b82f6; } /* Blue */
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-2xl">
+        <h1 class="text-4xl font-bold text-center mb-6 text-gray-800">❌ O 틱택토 게임</h1>
+        <div id="status" class="text-xl text-center mb-6 font-semibold text-gray-700">다음 차례: X</div>
+        
+        <div id="board" class="board-grid mx-auto rounded-lg overflow-hidden">
+            <!-- 9개의 cell이 JS에 의해 생성됩니다 -->
+        </div>
+
+        <button id="reset-button" class="mt-8 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95">
+            게임 재시작
+        </button>
+        <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
+            ← 메인 검색 페이지로 돌아가기
+        </a>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        const status = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+        
+        let currentPlayer = 'X';
+        let gameActive = true;
+        let boardState = Array(9).fill(null);
+
+        const WINNING_COMBOS = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+            [0, 4, 8], [2, 4, 6]             // diagonals
+        ];
+
+        function handleCellClick(e) {
+            const cell = e.target;
+            const index = parseInt(cell.dataset.index);
+
+            if (boardState[index] || !gameActive) {
+                return;
+            }
+
+            boardState[index] = currentPlayer;
+            cell.textContent = currentPlayer;
+            cell.classList.add('occupied', currentPlayer === 'X' ? 'x-color' : 'o-color');
+
+            if (checkWin()) {
+                status.textContent = `${currentPlayer} 승리! 🎉`;
+                gameActive = false;
+                highlightWinningCells();
+                return;
+            }
+
+            if (boardState.every(cell => cell)) {
+                status.textContent = `무승부입니다! 🤝`;
+                gameActive = false;
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            status.textContent = `다음 차례: ${currentPlayer}`;
+        }
+
+        function checkWin() {
+            return WINNING_COMBOS.some(combination => {
+                const [a, b, c] = combination;
+                return boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c];
+            });
+        }
+
+        function highlightWinningCells() {
+            WINNING_COMBOS.forEach(combination => {
+                const [a, b, c] = combination;
+                if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                    document.querySelector(`[data-index="${a}"]`).style.backgroundColor = '#fef3c7'; // Amber-100
+                    document.querySelector(`[data-index="${b}"]`).style.backgroundColor = '#fef3c7';
+                    document.querySelector(`[data-index="${c}"]`).style.backgroundColor = '#fef3c7';
+                }
+            });
+        }
+
+        function initializeGame() {
+            boardState = Array(9).fill(null);
+            gameActive = true;
+            currentPlayer = 'X';
+            status.textContent = `다음 차례: ${currentPlayer}`;
+            board.innerHTML = '';
+            
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell', 'transition-colors', 'duration-200');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleCellClick);
+                board.appendChild(cell);
+            }
+        }
+
+        resetButton.addEventListener('click', initializeGame);
+
+        // Initial setup
+        initializeGame();
+    </script>
+</body>
+</html>

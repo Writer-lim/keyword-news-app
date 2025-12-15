@@ -3,387 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>키워드 통합 검색기</title>
+    <title>통합 뉴스/미디어 검색기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        
         body {
-            font-family: 'Arial', sans-serif;
-            display: flex;
-            justify-content: center;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 50px 0;
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc; /* Blue Gray 50 */
         }
         .container {
-            width: 100%;
-            max-width: 1200px; /* 전체 컨테이너 폭 확장 */
-            padding: 30px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+            max-width: 1200px;
         }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
+        .result-card {
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        #search-form {
-            display: flex;
-            margin-bottom: 20px;
+        .result-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
         }
-        #keyword {
-            flex-grow: 1;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px 0 0 6px;
-            font-size: 16px;
+        .loading-animation {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
         }
-        #search-button {
-            padding: 12px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 0 6px 6px 0;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        #search-button:hover {
-            background-color: #0056b3;
-        }
-        #error-message, #loading {
-            color: red;
-            text-align: center;
-            margin-bottom: 15px;
-            font-weight: bold;
-        }
-        .nav-links {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .nav-links a {
-             margin: 0 10px; 
-             text-decoration: none; 
-             color: #007bff;
-        }
-
-        /* --- 통합 검색 결과 스타일 --- */
-        .content-wrapper {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .news-section {
-            flex: 3; /* 뉴스 섹션이 가장 넓게 */
-            min-width: 0; 
-        }
-        #news-results {
-            list-style: none;
-            padding: 0;
-        }
-        .news-item {
-            border-bottom: 1px solid #eee;
-            padding: 15px 0;
-        }
-        .news-item a {
-            font-size: 18px;
-            color: #007bff;
-            text-decoration: none;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-        }
-        .news-item .description { color: #555; font-size: 14px; }
-
-        /* 이미지/유튜브 섹션 컨테이너 */
-        .side-content {
-            flex: 2; /* 이미지와 유튜브 섹션 */
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .side-box {
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        }
-        .side-box h3 {
-            text-align: center;
-            color: #555;
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-        /* 이미지 갤러리 */
-        .image-gallery {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 10px;
-        }
-        .image-item img {
-            width: 100%;
-            height: 100px; /* 고정 높이 설정 */
-            border-radius: 4px;
-            object-fit: cover; /* 이미지가 잘리지 않고 채우도록 설정 */
-            display: block;
-        }
-        /* 유튜브 영상 목록 */
-        .youtube-item {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        .youtube-item img {
-            width: 100px;
-            height: 56px; /* 16:9 비율 유지 */
-            object-fit: cover;
-            border-radius: 4px;
-            flex-shrink: 0;
-        }
-        .youtube-info a {
-            font-size: 14px;
-            font-weight: bold;
-            color: #CC0000; /* 유튜브 레드 */
-            text-decoration: none;
-            display: block;
-            margin-bottom: 3px;
-        }
-        .youtube-info .channel-title {
-            font-size: 12px;
-            color: #888;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="nav-links">
-            <a href="/">메인 페이지로 돌아가기</a>
-        </div>
-        <h1>키워드 뉴스 & 이미지 & 유튜브 통합 검색기 📰🖼️▶️</h1>
-        
-        <div id="search-form">
-            <input type="text" id="keyword" placeholder="검색할 키워드를 입력하세요" value="코인">
-            <button id="search-button">검색</button>
-        </div>
-        
-        <div id="loading" style="display: none;">검색 중...</div>
-        <div id="error-message"></div>
+<body class="p-4 md:p-8">
 
-        <div class="content-wrapper">
-            <div class="news-section">
-                <h2>뉴스 검색 결과</h2>
-                <ul id="news-results">
-                    </ul>
+    <!-- Header & Navigation -->
+    <header class="container mx-auto py-4 flex justify-between items-center border-b border-gray-200 mb-8">
+        <h1 class="text-3xl font-extrabold text-gray-900">
+            <i class="fas fa-search text-indigo-500 mr-2"></i> 통합 미디어 검색기
+        </h1>
+        <a href="/game/tictactoe" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-full shadow-md transition-colors transform hover:scale-105 active:scale-95">
+            <i class="fas fa-gamepad mr-2"></i> 틱택토 게임하기
+        </a>
+    </header>
+
+    <!-- Main Search Area -->
+    <main class="container mx-auto">
+        <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-10">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="search-input" placeholder="검색할 키워드를 입력하세요 (예: 제미나이)" 
+                       class="flex-grow p-3 border-2 border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg">
+                <button onclick="performSearch()" id="search-button"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors flex items-center justify-center disabled:opacity-50">
+                    <i class="fas fa-bolt mr-2"></i> 통합 검색 실행
+                </button>
             </div>
+            <div id="loading-indicator" class="hidden mt-4 text-center">
+                <div class="loading-animation mx-auto"></div>
+                <p class="text-indigo-500 mt-2">검색 중...</p>
+            </div>
+        </div>
+
+        <!-- Results Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            <div class="side-content">
-                <div class="side-box" id="image-section">
-                    <h3>관련 이미지</h3>
-                    <div class="image-gallery" id="image-gallery">
-                        </div>
-                    <div id="image-error-message" style="color: gray; text-align: center; font-size: 12px;"></div>
+            <!-- News Results Column -->
+            <div class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-red-500 pb-2 flex items-center">
+                    <i class="fas fa-newspaper text-red-500 mr-2"></i> 네이버 뉴스
+                </h2>
+                <div id="news-results" class="space-y-4">
+                    <p class="text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>
                 </div>
+            </div>
 
-                <div class="side-box" id="youtube-section">
-                    <h3>관련 유튜브 영상</h3>
-                    <div id="youtube-results">
-                        </div>
-                    <div id="youtube-error-message" style="color: gray; text-align: center; font-size: 12px;"></div>
+            <!-- Image Results Column -->
+            <div class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-green-500 pb-2 flex items-center">
+                    <i class="fas fa-image text-green-500 mr-2"></i> 네이버 이미지
+                </h2>
+                <div id="image-results" class="grid grid-cols-2 gap-4">
+                    <p class="col-span-2 text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>
+                </div>
+            </div>
+
+            <!-- YouTube Results Column -->
+            <div class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 pb-2 flex items-center">
+                    <i class="fab fa-youtube text-blue-500 mr-2"></i> 유튜브 영상
+                </h2>
+                <div id="youtube-results" class="space-y-4">
+                    <p class="text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
-        const keywordInput = document.getElementById('keyword');
+        // DOM 요소 참조
+        const searchInput = document.getElementById('search-input');
         const searchButton = document.getElementById('search-button');
-        const loadingMessage = document.getElementById('loading');
-        
-        // 뉴스 영역
-        const resultsContainer = document.getElementById('news-results');
-        const errorMessage = document.getElementById('error-message');
-        
-        // 이미지 영역
-        const imageGallery = document.getElementById('image-gallery');
-        const imageErrorMessage = document.getElementById('image-error-message');
-        
-        // 유튜브 영역
-        const youtubeResults = document.getElementById('youtube-results');
-        const youtubeErrorMessage = document.getElementById('youtube-error-message');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const newsResultsDiv = document.getElementById('news-results');
+        const imageResultsDiv = document.getElementById('image-results');
+        const youtubeResultsDiv = document.getElementById('youtube-results');
 
+        // HTML 엔티티 디코딩 함수
+        function decodeHTMLEntities(str) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(str, 'text/html');
+            return doc.body.textContent;
+        }
 
-        searchButton.addEventListener('click', searchAll);
-        keywordInput.addEventListener('keypress', (e) => {
+        // 검색 버튼 및 Enter 키 이벤트 리스너
+        searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                searchAll();
+                performSearch();
             }
         });
 
-        function cleanHtml(htmlString) {
-            return htmlString.replace(/<[^>]*>/g, '');
+        // UI 상태 관리 함수
+        function setUIState(isLoading) {
+            searchButton.disabled = isLoading;
+            loadingIndicator.classList.toggle('hidden', !isLoading);
+            searchButton.classList.toggle('bg-indigo-600', !isLoading);
+            searchButton.classList.toggle('bg-gray-400', isLoading);
+            searchButton.innerHTML = isLoading ? '<div class="loading-animation"></div>' : '<i class="fas fa-bolt mr-2"></i> 통합 검색 실행';
         }
 
-        function formatNewsDate(dateString) {
-            if (dateString) {
-                try {
-                    const date = new Date(dateString);
-                    return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) 
-                           + ' ' + date.toLocaleTimeString('ko-KR');
-                } catch (e) {
-                    return dateString;
-                }
+        // 결과 영역 초기화 함수
+        function clearResults() {
+            newsResultsDiv.innerHTML = '<p class="text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>';
+            imageResultsDiv.innerHTML = '<p class="col-span-2 text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>';
+            youtubeResultsDiv.innerHTML = '<p class="text-gray-500 italic">검색 결과가 여기에 표시됩니다.</p>';
+        }
+
+        // --- 렌더링 함수 ---
+        function renderNews(item) {
+            const title = decodeHTMLEntities(item.title);
+            const description = decodeHTMLEntities(item.description);
+            return `
+                <a href="${item.link}" target="_blank" class="result-card block p-4 bg-white border border-gray-100 rounded-lg shadow-sm hover:border-red-500 transition-all">
+                    <h3 class="font-bold text-base mb-1 text-gray-900 line-clamp-2">${title}</h3>
+                    <p class="text-sm text-gray-500 line-clamp-3">${description}</p>
+                    <span class="text-xs text-red-600 mt-2 block">${item.pubDate ? new Date(item.pubDate).toLocaleDateString('ko-KR') : item.publisher}</span>
+                </a>
+            `;
+        }
+
+        function renderImage(item) {
+            // 네이버 이미지 API는 실제 썸네일 URL을 제공합니다.
+            return `
+                <div class="result-card bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 hover:border-green-500 transition-all">
+                    <a href="${item.link}" target="_blank" class="block">
+                        <img src="${item.thumbnail}" alt="${decodeHTMLEntities(item.title)}" 
+                             class="w-full h-32 object-cover" 
+                             onerror="this.onerror=null; this.src='https://placehold.co/150x150/e0f2f7/065f46?text=No+Image'"
+                        >
+                        <div class="p-2">
+                            <p class="text-xs text-gray-600 line-clamp-1">${decodeHTMLEntities(item.title)}</p>
+                        </div>
+                    </a>
+                </div>
+            `;
+        }
+
+        function renderYoutube(item) {
+            const videoId = item.id.videoId;
+            const title = item.snippet.title;
+            const thumbnailUrl = item.snippet.thumbnails.medium.url;
+
+            return `
+                <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" class="result-card block bg-white border border-gray-100 rounded-lg shadow-sm hover:border-blue-500 transition-all overflow-hidden">
+                    <img src="${thumbnailUrl}" alt="${title}" class="w-full object-cover h-40">
+                    <div class="p-3">
+                        <h3 class="font-bold text-sm text-gray-900 line-clamp-2">${title}</h3>
+                        <p class="text-xs text-gray-500 mt-1 line-clamp-1">채널: ${item.snippet.channelTitle}</p>
+                    </div>
+                </a>
+            `;
+        }
+
+        // --- 메인 검색 로직 ---
+        async function fetchAPI(endpoint, query) {
+            const url = `${endpoint}?query=${encodeURIComponent(query)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`API error at ${endpoint}: ${response.statusText}`);
             }
-            return dateString;
+            return await response.json();
         }
 
-        // -----------------------------------------------------
-        // 1. 뉴스 검색 로직
-        // -----------------------------------------------------
-        async function searchNews(keyword) {
-            const response = await fetch('/api/search_news/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ keyword: keyword })
-            });
-
-            const data = await response.json();
-            
-            if (response.ok) {
-                if (data.items && data.items.length > 0) {
-                    data.items.forEach(item => {
-                        const li = document.createElement('li');
-                        li.className = 'news-item';
-                        
-                        const title = cleanHtml(item.title);
-                        const description = cleanHtml(item.description);
-                        const pubDate = formatNewsDate(item.pubDate); 
-                        
-                        li.innerHTML = `
-                            <a href="${item.link}" target="_blank">${title}</a>
-                            <div class="description">${description}</div>
-                            <div class="date">${pubDate}</div>
-                        `;
-                        resultsContainer.appendChild(li);
-                    });
-                } else {
-                    errorMessage.textContent = `"${keyword}"에 대한 뉴스 검색 결과가 없습니다.`;
-                }
-            } else {
-                const errorMsg = data.error || `뉴스 서버 오류 발생 (${response.status_code})`;
-                errorMessage.textContent = errorMsg;
-            }
-        }
-
-        // -----------------------------------------------------
-        // 2. 이미지 검색 로직
-        // -----------------------------------------------------
-        async function searchImage(keyword) {
-            const response = await fetch('/api/search_image/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ keyword: keyword })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.items && data.items.length > 0) {
-                    data.items.forEach(item => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'image-item';
-                        const imageUrl = item.thumbnail || item.link; 
-                        
-                        itemDiv.innerHTML = `<a href="${item.link}" target="_blank"><img src="${imageUrl}" alt="${cleanHtml(item.title)}"></a>`;
-                        imageGallery.appendChild(itemDiv);
-                    });
-                } else {
-                    imageErrorMessage.textContent = `이미지 결과 없음.`;
-                }
-            } else {
-                const errorMsg = data.error || `이미지 서버 오류 발생 (${response.status_code})`;
-                imageErrorMessage.textContent = errorMsg;
-            }
-        }
-
-        // -----------------------------------------------------
-        // 3. 유튜브 검색 로직 (새로 추가)
-        // -----------------------------------------------------
-        async function searchYoutube(keyword) {
-            const response = await fetch('/api/search_youtube/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ keyword: keyword })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.items && data.items.length > 0) {
-                    data.items.forEach(item => {
-                        // YouTube Data API 결과 구조에 맞게 파싱
-                        const videoId = item.id.videoId;
-                        const snippet = item.snippet;
-                        
-                        if (videoId && snippet) {
-                            const itemDiv = document.createElement('div');
-                            itemDiv.className = 'youtube-item';
-                            
-                            itemDiv.innerHTML = `
-                                <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
-                                    <img src="${snippet.thumbnails.medium.url}" alt="${snippet.title}">
-                                </a>
-                                <div class="youtube-info">
-                                    <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">${snippet.title}</a>
-                                    <div class="channel-title">${snippet.channelTitle}</div>
-                                </div>
-                            `;
-                            youtubeResults.appendChild(itemDiv);
-                        }
-                    });
-                } else {
-                    youtubeErrorMessage.textContent = `유튜브 영상 결과 없음.`;
-                }
-            } else {
-                const errorMsg = data.error || `유튜브 서버 오류 발생 (${response.status_code})`;
-                youtubeErrorMessage.textContent = errorMsg;
-            }
-        }
-
-
-        // -----------------------------------------------------
-        // 4. 통합 검색 실행 함수 (모든 API를 동시에 실행)
-        // -----------------------------------------------------
-        async function searchAll() {
-            const keyword = keywordInput.value.trim();
-            if (!keyword) {
-                errorMessage.textContent = '키워드를 입력해 주세요.';
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            if (!query) {
+                alert('검색 키워드를 입력해 주세요.');
                 return;
             }
 
-            // 상태 초기화
-            errorMessage.textContent = '';
-            imageErrorMessage.textContent = '';
-            youtubeErrorMessage.textContent = '';
-            resultsContainer.innerHTML = '';
-            imageGallery.innerHTML = '';
-            youtubeResults.innerHTML = '';
-            loadingMessage.style.display = 'block';
+            clearResults();
+            setUIState(true);
+
+            // 네 개의 API 호출을 동시에 실행
+            const promises = [
+                fetchAPI('/api/search_news', query),
+                fetchAPI('/api/search_image', query),
+                fetchAPI('/api/search_youtube', query)
+            ];
 
             try {
-                // Promise.all을 사용하여 뉴스, 이미지, 유튜브 검색을 동시에 실행
-                await Promise.all([
-                    searchNews(keyword),
-                    searchImage(keyword),
-                    searchYoutube(keyword) // 유튜브 검색 추가
-                ]);
+                const [newsData, imageData, youtubeData] = await Promise.all(promises);
+
+                // 뉴스 렌더링
+                if (newsData.items && newsData.items.length > 0) {
+                    newsResultsDiv.innerHTML = newsData.items.map(renderNews).join('');
+                } else {
+                    newsResultsDiv.innerHTML = '<p class="text-gray-500 italic p-2">검색 결과가 없습니다.</p>';
+                }
+                
+                // 이미지 렌더링
+                if (imageData.items && imageData.items.length > 0) {
+                    imageResultsDiv.innerHTML = imageData.items.map(renderImage).join('');
+                } else {
+                    imageResultsDiv.innerHTML = '<p class="col-span-2 text-gray-500 italic p-2">검색 결과가 없습니다.</p>';
+                }
+
+                // 유튜브 렌더링
+                if (youtubeData.items && youtubeData.items.length > 0) {
+                    youtubeResultsDiv.innerHTML = youtubeData.items.map(renderYoutube).join('');
+                } else {
+                    youtubeResultsDiv.innerHTML = '<p class="text-gray-500 italic p-2">검색 결과가 없습니다.</p>';
+                }
 
             } catch (error) {
-                console.error('통합 검색 오류:', error);
-                errorMessage.textContent = `통합 서버 오류 발생: ${error.message}.`;
+                console.error("통합 검색 중 오류 발생:", error);
+                alert('검색 중 오류가 발생했습니다. 콘솔을 확인해 주세요.');
+                
+                // 오류 메시지 표시
+                newsResultsDiv.innerHTML = '<p class="text-red-500 italic p-2">뉴스 검색 오류</p>';
+                imageResultsDiv.innerHTML = '<p class="col-span-2 text-red-500 italic p-2">이미지 검색 오류</p>';
+                youtubeResultsDiv.innerHTML = '<p class="text-red-500 italic p-2">유튜브 검색 오류</p>';
             } finally {
-                loadingMessage.style.display = 'none';
+                setUIState(false);
             }
         }
     </script>
