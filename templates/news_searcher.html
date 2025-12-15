@@ -191,7 +191,13 @@
             const url = `${endpoint}?query=${encodeURIComponent(query)}`;
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`API error at ${endpoint}: ${response.statusText}`);
+                // 서버에서 500 오류가 발생하면 JSON 형식의 에러 메시지를 시도합니다.
+                try {
+                    const errorJson = await response.json();
+                    throw new Error(`API error at ${endpoint}: ${errorJson.error || response.statusText}`);
+                } catch {
+                    throw new Error(`API error at ${endpoint}: ${response.statusText}`);
+                }
             }
             return await response.json();
         }
@@ -199,14 +205,15 @@
         async function performSearch() {
             const query = searchInput.value.trim();
             if (!query) {
-                alert('검색 키워드를 입력해 주세요.');
+                // alert() 대신 메시지 박스를 사용해야 하지만, 현재는 console.log로 대체
+                console.log('검색 키워드를 입력해 주세요.');
                 return;
             }
 
             clearResults();
             setUIState(true);
 
-            // 네 개의 API 호출을 동시에 실행
+            // 세 개의 API 호출을 동시에 실행
             const promises = [
                 fetchAPI('/api/search_news', query),
                 fetchAPI('/api/search_image', query),
@@ -239,12 +246,10 @@
 
             } catch (error) {
                 console.error("통합 검색 중 오류 발생:", error);
-                alert('검색 중 오류가 발생했습니다. 콘솔을 확인해 주세요.');
-                
                 // 오류 메시지 표시
-                newsResultsDiv.innerHTML = '<p class="text-red-500 italic p-2">뉴스 검색 오류</p>';
-                imageResultsDiv.innerHTML = '<p class="col-span-2 text-red-500 italic p-2">이미지 검색 오류</p>';
-                youtubeResultsDiv.innerHTML = '<p class="text-red-500 italic p-2">유튜브 검색 오류</p>';
+                newsResultsDiv.innerHTML = `<p class="text-red-500 italic p-2">뉴스 검색 오류: ${error.message}</p>`;
+                imageResultsDiv.innerHTML = `<p class="col-span-2 text-red-500 italic p-2">이미지 검색 오류: ${error.message}</p>`;
+                youtubeResultsDiv.innerHTML = `<p class="text-red-500 italic p-2">유튜브 검색 오류: ${error.message}</p>`;
             } finally {
                 setUIState(false);
             }
