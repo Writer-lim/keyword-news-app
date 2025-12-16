@@ -1,4 +1,3 @@
-// [tetris.html 파일 전체 코드]
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -33,6 +32,7 @@
             border: 1px solid #334155;
             box-sizing: border-box;
             background-color: transparent;
+            transition: background-color 0.05s ease; /* 블록 이동 시 부드럽게 */
         }
         
         /* 블록 색상 정의 (Tailwind palette 사용) */
@@ -43,7 +43,7 @@
         .L { background-color: #f97316; } /* Orange */
         .S { background-color: #22c55e; } /* Green */
         .Z { background-color: #ef4444; } /* Red */
-        .ghost { opacity: 0.3; } /* 고스트 블록 (미리보기) */
+        .transparent { background-color: transparent !important; } /* 투명 */
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
@@ -107,7 +107,6 @@
         const nextPieceContainer = document.getElementById('next-piece-container');
         
         // --- 블록 정의 (Tetrominoes) ---
-        // 각 배열은 4x4 그리드에서 블록의 모양을 나타냅니다.
         const TETROMINOES = [
             { shape: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], color: 'I' }, // I
             { shape: [[1, 1], [1, 1]], color: 'O' }, // O
@@ -136,7 +135,6 @@
             isGameOver = false;
             isGameActive = false;
             
-            // UI 초기화
             scoreDisplay.textContent = `점수: 0`;
             linesDisplay.textContent = `줄 수: 0`;
             statusElement.textContent = `준비, 시작 버튼을 누르세요.`;
@@ -145,14 +143,13 @@
             nextPieceContainer.innerHTML = '';
             
             renderBoard();
-            newPiece(true); // 첫 블록과 다음 블록 준비 (true: 강제 생성)
+            newPiece(true);
         }
 
-        // 보드 DOM 요소 생성 및 스타일 설정
         function renderBoard() {
             boardElement.style.gridTemplateColumns = `repeat(${COLS}, ${CELL_SIZE}px)`;
-            boardElement.style.width = `${COLS * CELL_SIZE + 8}px`; // 보드 너비 고정 (4px border 포함)
-            boardElement.style.height = `${ROWS * CELL_SIZE + 8}px`; // 보드 높이 고정 (4px border 포함)
+            boardElement.style.width = `${COLS * CELL_SIZE + 8}px`; 
+            boardElement.style.height = `${ROWS * CELL_SIZE + 8}px`; 
             boardElement.innerHTML = '';
 
             for (let r = 0; r < ROWS; r++) {
@@ -168,37 +165,30 @@
 
         // --- 핵심 로직 ---
 
-        // 새로운 블록 생성
         function newPiece(isInitial = false) {
-            // 다음 블록을 현재 블록으로 사용하거나, 무작위 블록 생성
             if (!nextPiece || isInitial) {
                 const randomIndex = Math.floor(Math.random() * TETROMINOES.length);
                 nextPiece = JSON.parse(JSON.stringify(TETROMINOES[randomIndex]));
             }
             currentPiece = nextPiece;
             
-            // 다음 블록 미리보기 설정
             const nextRandomIndex = Math.floor(Math.random() * TETROMINOES.length);
             nextPiece = JSON.parse(JSON.stringify(TETROMINOES[nextRandomIndex]));
             renderNextPiece();
 
-            // 블록 초기 위치 수정: 화면 밖 (row = -1 혹은 -2)에서 시작하도록 수정
             const dim = currentPiece.shape.length;
-            let initialRow = -2; 
-            // O 블록 같은 2x2 블록은 -2에서 시작하면 보드에 닿지 않을 수 있으므로 조정
-            if (dim === 2) initialRow = 0; 
+            let initialRow = -2; // 대부분의 블록은 화면 밖 -2에서 시작
+            if (dim === 2) initialRow = 0; // O 블록 같은 2x2 블록은 0에서 시작
 
             currentPiece.row = initialRow; 
             currentPiece.col = Math.floor(COLS / 2) - Math.floor(dim / 2);
 
-            // 시작하자마자 충돌하면 게임 오버 (첫 블록 이후에만 검사)
             if (!isInitial && checkCollision(0, 0, currentPiece.shape)) {
                 gameOver();
                 return;
             }
         }
 
-        // 블록이 이동/회전할 수 있는지 확인 (충돌 검사)
         function checkCollision(rOffset, cOffset, shape) {
             const pieceRow = currentPiece.row + rOffset;
             const pieceCol = currentPiece.col + cOffset;
@@ -210,55 +200,38 @@
                         const targetRow = pieceRow + r;
                         const targetCol = pieceCol + c;
 
-                        // 1. 좌우 벽과 충돌하는 경우
-                        if (targetCol < 0 || targetCol >= COLS) {
-                            return true;
-                        }
-                        // 2. 바닥과 충돌하는 경우
-                        if (targetRow >= ROWS) {
+                        if (targetCol < 0 || targetCol >= COLS || targetRow >= ROWS) {
                             return true;
                         }
                         
-                        // 3. 이미 쌓인 블록과 충돌하는 경우
-                        // targetRow가 화면 내부(0 <= r < ROWS)일 때만 grid 검사
-                        if (targetRow >= 0) { 
-                             if (grid[targetRow][targetCol] !== 0) {
-                                return true;
-                            }
+                        // 화면 내부에 있는 셀만 이미 고정된 블록과 충돌하는지 확인
+                        if (targetRow >= 0 && targetRow < ROWS && grid[targetRow][targetCol] !== 0) { 
+                            return true;
                         }
-                        // targetRow < 0 인 경우는 충돌 검사를 무시하고 통과시킴 (수정된 부분)
                     }
                 }
             }
             return false;
         }
 
-        // 블록을 움직이는 함수
         function movePiece(rChange, cChange) {
             if (!isGameActive) return;
 
-            // 이동 가능한지 확인
             if (!checkCollision(rChange, cChange, currentPiece.shape)) {
-                // 기존 위치의 블록을 지우고
-                draw(true); 
-                // 새 위치로 업데이트
+                draw(true); // 기존 위치의 블록을 지우고
                 currentPiece.row += rChange;
                 currentPiece.col += cChange;
-                // 새 위치에 그림
-                draw(); 
+                draw(); // 새 위치에 그림
                 return true;
             } else if (rChange === 1) {
-                // 아래로 이동하려다 충돌하면 블록을 고정시킴
-                lockPiece();
+                lockPiece(); // 아래로 이동하려다 충돌하면 고정
             }
             return false;
         }
 
-        // 블록 회전
         function rotatePiece() {
             if (!isGameActive) return;
 
-            // 4x4 행렬 회전 (시계 방향)
             const dim = currentPiece.shape.length;
             let newShape = Array(dim).fill(0).map(() => Array(dim).fill(0));
             
@@ -268,15 +241,13 @@
                 }
             }
             
-            // 회전 후 충돌 검사 (벽차기 kick 로직은 일단 생략)
             if (!checkCollision(0, 0, newShape)) {
-                draw(true); // 기존 블록 지우기
+                draw(true);
                 currentPiece.shape = newShape;
-                draw(); // 회전된 블록 그리기
+                draw();
             }
         }
 
-        // 블록을 격자에 고정하고, 줄 제거 및 새 블록 생성
         function lockPiece() {
             const shape = currentPiece.shape;
             const dim = shape.length;
@@ -287,8 +258,7 @@
                         const targetRow = currentPiece.row + r;
                         const targetCol = currentPiece.col + c;
 
-                        // 화면 위로 넘어간 블록도 고정하지 않고 무시 (게임 오버는 newPiece에서 처리)
-                        if (targetRow >= 0) {
+                        if (targetRow >= 0) { // 화면 안에 있는 블록만 격자에 고정
                             grid[targetRow][targetCol] = currentPiece.color;
                         }
                     }
@@ -299,22 +269,19 @@
             newPiece();
         }
 
-        // 완성된 줄 제거
         function clearLines() {
             let lines = 0;
 
             for (let r = ROWS - 1; r >= 0; r--) {
                 if (grid[r].every(cell => cell !== 0)) {
-                    // 줄 제거: 해당 줄을 제거하고 위에 있는 모든 줄을 한 칸씩 내림
                     grid.splice(r, 1);
                     grid.unshift(Array(COLS).fill(0));
                     lines++;
-                    r++; // 줄이 내려왔으므로 현재 줄을 다시 검사해야 함
+                    r++; 
                 }
             }
 
             if (lines > 0) {
-                // 점수 계산 (테트리스 고전 점수 공식 사용)
                 score += [0, 40, 100, 300, 1200][lines];
                 linesCleared += lines;
                 scoreDisplay.textContent = `점수: ${score}`;
@@ -322,12 +289,12 @@
             }
         }
 
-        // 블록을 그리거나 지우는 함수
+        // 블록을 그리거나 지우는 함수 (수정: 클래스와 style.backgroundColor 병행)
         function draw(erase = false) {
             const shape = currentPiece.shape;
             const dim = shape.length;
-            const color = erase ? 'transparent' : currentPiece.color;
-            const classToRemove = erase ? currentPiece.color : '';
+            const colorClass = currentPiece.color;
+            const colorValue = erase ? '' : getComputedStyle(document.documentElement).getPropertyValue('--tw-color-' + colorClass) || colorClass;
 
             for (let r = 0; r < dim; r++) {
                 for (let c = 0; c < dim; c++) {
@@ -335,24 +302,25 @@
                         const targetRow = currentPiece.row + r;
                         const targetCol = currentPiece.col + c;
 
-                        // 화면 안에 있는 셀만 그리기/지우기
                         if (targetRow >= 0 && targetRow < ROWS && targetCol >= 0 && targetCol < COLS) {
                             const cellElement = boardElement.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`);
                             if (cellElement) {
-                                // 기존 클래스 제거
+                                // 기존 색상 클래스 모두 제거 (안전성 확보)
+                                TETROMINOES.forEach(t => cellElement.classList.remove(t.color));
+
                                 if (erase) {
-                                    cellElement.classList.remove(classToRemove);
+                                    // 지우기: 배경색 초기화 (CSS로 설정된 #1e293b 배경색이 나타남)
+                                    cellElement.style.backgroundColor = ''; 
                                 } else {
-                                    cellElement.classList.add(color);
+                                    // 그리기: 해당 블록의 색상 클래스 추가
+                                    cellElement.classList.add(colorClass); 
                                 }
-                                cellElement.style.backgroundColor = erase ? '' : color; // 클래스만으로 색상 처리
                             }
                         }
                     }
                 }
             }
 
-            // 고정된 블록 상태도 함께 업데이트하여 현재 블록이 지워진 후 보이게 함
             updateBoardDisplay(); 
         }
 
@@ -362,28 +330,25 @@
                 for (let c = 0; c < COLS; c++) {
                     const cellElement = boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
                     if (cellElement) {
-                        // 기존 색상 클래스 모두 제거
+                        // 모든 색상 클래스 제거
                         TETROMINOES.forEach(t => cellElement.classList.remove(t.color));
-                        cellElement.classList.remove('ghost');
-                        cellElement.style.backgroundColor = '';
-
+                        
                         const colorName = grid[r][c];
                         if (colorName !== 0) {
                             cellElement.classList.add(colorName);
                         } else {
-                             cellElement.style.backgroundColor = ''; // 배경색 투명으로
+                            // 셀이 비어 있으면 배경색 초기화 (CSS 배경색인 #1e293b가 보이도록)
+                             cellElement.style.backgroundColor = ''; 
                         }
                     }
                 }
             }
         }
 
-        // 다음 블록 미리보기를 렌더링
         function renderNextPiece() {
             nextPieceContainer.innerHTML = '';
             const dim = nextPiece.shape.length;
             
-            // 4x4 미리보기 그리드 생성
             const nextGrid = document.createElement('div');
             nextGrid.style.display = 'grid';
             nextGrid.style.gridTemplateColumns = `repeat(${dim}, 20px)`;
@@ -413,7 +378,6 @@
         
         function startGame() {
             if (isGameActive || isGameOver) {
-                // 이미 실행 중이거나 끝났다면 리셋 후 시작
                 initializeGame();
             }
 
@@ -421,8 +385,8 @@
             statusElement.textContent = "게임 진행 중...";
             startButton.textContent = "재시작";
             
-            // 초기 블록 바로 시작
-            gameTick();
+            // 초기 블록을 즉시 그리기
+            draw();
             // 게임 루프 시작
             gameLoop = setInterval(gameTick, DROP_INTERVAL);
         }
@@ -430,7 +394,6 @@
         function gameTick() {
             // 한 칸 아래로 이동
             if (!movePiece(1, 0)) {
-                // 이동 실패 시 (충돌)
                 // lockPiece는 movePiece 안에서 처리됨
             }
         }
@@ -442,7 +405,6 @@
             statusElement.textContent = "게임 오버! 💀";
             startButton.textContent = "다시 시작";
             
-            // 게임 오버 시 현재 블록을 지움
             draw(true);
             
             console.log("Game Over. Final Score:", score);
@@ -452,48 +414,43 @@
         function handleKeyDown(e) {
             if (!isGameActive) return;
 
-            e.preventDefault(); // 기본 스크롤 동작 방지
+            e.preventDefault(); 
 
             switch (e.key) {
                 case 'ArrowLeft':
                 case 'a':
-                    movePiece(0, -1); // 왼쪽
+                    movePiece(0, -1); 
                     break;
                 case 'ArrowRight':
                 case 'd':
-                    movePiece(0, 1); // 오른쪽
+                    movePiece(0, 1); 
                     break;
                 case 'ArrowDown':
                 case 's':
-                    // soft drop (한 칸만 내리고 점수 보너스 없음)
                     movePiece(1, 0); 
                     break;
                 case 'ArrowUp':
                 case 'w':
-                    rotatePiece(); // 회전
+                    rotatePiece(); 
                     break;
-                case ' ': // 스페이스 바 (Hard Drop)
+                case ' ': 
                     hardDrop();
                     break;
             }
         }
         
-        // 하드 드롭 (바닥까지 한번에)
         function hardDrop() {
             if (!isGameActive) return;
             
             let dropDistance = 0;
-            // 충돌할 때까지 계속 아래로 이동 시도
+            
             while (!checkCollision(dropDistance + 1, 0, currentPiece.shape)) {
                 dropDistance++;
             }
             
-            // 최종 위치로 이동 및 고정
-            // 이 시점에서 블록은 화면에 그려져 있지 않을 수 있으므로 draw를 먼저 호출하여 지울 필요 없음
             currentPiece.row += dropDistance;
             lockPiece();
             
-            // 타이머 초기화 (다음 틱을 기다리지 않고 바로 다음 블록 시작)
             clearInterval(gameLoop);
             gameLoop = setInterval(gameTick, DROP_INTERVAL);
         }
@@ -501,7 +458,6 @@
         // --- 초기화 및 이벤트 연결 ---
         startButton.addEventListener('click', startGame);
         
-        // 페이지 로드 시 초기화
         initializeGame();
     </script>
 </body>
