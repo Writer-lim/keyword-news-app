@@ -2,21 +2,388 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>PONG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>퐁 게임 (Pong Game)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="p-8 flex flex-col items-center justify-center min-h-screen bg-gray-50">
-    <div class="bg-white p-8 rounded-xl shadow-2xl text-center">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">PONG</h1>
-        <p class="text-lg text-red-500 mb-6">아직 게임 코드가 들어가지 않았습니다!</p>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
         
-        <div class="w-64 h-64 bg-gray-200 flex items-center justify-center text-gray-500">
-            [🚧 게임 영역 🚧]
+        /* 캔버스 컨테이너 및 스타일 */
+        #pong-container {
+            position: relative;
+            background-color: #1e293b; /* Slate-800 */
+            border: 4px solid #334155;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            margin: 0 auto;
+        }
+
+        /* 게임 요소에 대한 클래스 정의는 JS에서 캔버스를 사용하므로 필요 없음 */
+        
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col md:flex-row gap-6">
+        
+        <div class="w-full md:w-56 p-4 bg-gray-100 rounded-lg flex flex-col justify-between">
+            <h1 class="text-3xl font-bold text-center mb-4 text-gray-800">🏓 퐁 게임</h1>
+
+            <div class="text-xl font-semibold mb-4 space-y-2">
+                <div id="player-score" class="text-blue-600"><i class="fas fa-user mr-2"></i> 내 점수: 0</div>
+                <div id="ai-score" class="text-red-600"><i class="fas fa-robot mr-2"></i> AI 점수: 0</div>
+                <div id="status" class="text-gray-800 font-bold">대기 중...</div>
+            </div>
+
+            <div class="mb-4 text-sm text-gray-700">
+                <h3 class="font-bold mb-1">🎮 조작 키 (왼쪽 패들)</h3>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li>**위**: ↑ (방향키 위)</li>
+                    <li>**아래**: ↓ (방향키 아래)</li>
+                    <li>**멈춤/재개**: Space (스페이스 바)</li>
+                </ul>
+            </div>
+
+            <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95">
+                게임 시작
+            </button>
         </div>
 
-        <a href="/" class="block mt-8 text-indigo-500 hover:text-indigo-700 font-medium">
-            ← 메인 검색 페이지로 돌아가기
-        </a>
+        <div id="pong-container">
+            <canvas id="game-canvas" width="600" height="400"></canvas>
+        </div>
     </div>
+
+    <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
+        ← 메인 검색 페이지로 돌아가기
+    </a>
+
+    <script>
+        // --- 게임 설정 ---
+        const CANVAS_WIDTH = 600;
+        const CANVAS_HEIGHT = 400;
+        const PADDLE_WIDTH = 10;
+        const PADDLE_HEIGHT = 80;
+        const BALL_SIZE = 10;
+        const PADDLE_SPEED = 6;
+        const AI_DIFFICULTY = 0.08; // 0.05 ~ 0.15 사이, 높을수록 어려움
+        const MAX_SCORE = 10;
+        
+        // --- DOM 요소 ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const playerScoreDisplay = document.getElementById('player-score');
+        const aiScoreDisplay = document.getElementById('ai-score');
+        const statusElement = document.getElementById('status');
+        const startButton = document.getElementById('start-button');
+
+        // --- 게임 객체 ---
+        let player, ai, ball;
+        let playerMoveUp = false;
+        let playerMoveDown = false;
+        let playerScore = 0;
+        let aiScore = 0;
+        let animationFrame;
+        let isGameActive = false;
+        let isGameOver = false;
+
+        // --- 객체 정의 클래스 ---
+
+        class Paddle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.width = PADDLE_WIDTH;
+                this.height = PADDLE_HEIGHT;
+                this.color = color;
+                this.score = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        class Ball {
+            constructor(x, y, size, color) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = color;
+                this.speed = 4;
+                this.dx = this.speed * (Math.random() < 0.5 ? 1 : -1); // 랜덤 수평 방향
+                this.dy = this.speed * (Math.random() * 2 - 1); // -speed ~ +speed 수직 방향
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+            }
+
+            reset() {
+                this.x = CANVAS_WIDTH / 2 - this.size / 2;
+                this.y = CANVAS_HEIGHT / 2 - this.size / 2;
+                this.speed = 4;
+                
+                // 공의 방향을 잃은 플레이어 쪽으로 시작하도록 조정
+                const direction = (playerScore > aiScore) ? 1 : -1;
+                
+                this.dx = this.speed * direction;
+                this.dy = this.speed * (Math.random() * 2 - 1); 
+            }
+        }
+
+        // --- 초기화 및 렌더링 ---
+
+        function initializeGame() {
+            // 게임 객체 초기화
+            player = new Paddle(10, CANVAS_HEIGHT / 2 - PADDLE_HEIGHT / 2, '#4ade80'); // Green
+            ai = new Paddle(CANVAS_WIDTH - 10 - PADDLE_WIDTH, CANVAS_HEIGHT / 2 - PADDLE_HEIGHT / 2, '#f87171'); // Red
+            ball = new Ball(CANVAS_WIDTH / 2 - BALL_SIZE / 2, CANVAS_HEIGHT / 2 - BALL_SIZE / 2, BALL_SIZE, '#ffffff'); // White
+            
+            // 상태 변수 초기화
+            playerScore = 0;
+            aiScore = 0;
+            isGameActive = false;
+            isGameOver = false;
+            playerMoveUp = false;
+            playerMoveDown = false;
+            
+            // 화면 및 UI 초기화
+            ball.reset(); 
+            updateScores();
+            statusElement.textContent = "준비, 시작 버튼을 누르세요.";
+            startButton.textContent = "게임 시작";
+            
+            drawElements();
+        }
+        
+        function drawElements() {
+            // 캔버스 초기화 (배경)
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            // 중앙선
+            ctx.strokeStyle = '#64748b';
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(CANVAS_WIDTH / 2, 0);
+            ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
+            ctx.stroke();
+            ctx.setLineDash([]); // 대시 초기화
+            
+            // 객체 그리기
+            player.draw();
+            ai.draw();
+            ball.draw();
+        }
+
+        // --- 게임 루프 및 로직 ---
+
+        function gameLoop() {
+            if (!isGameActive) {
+                return;
+            }
+            
+            update();
+            drawElements();
+            
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            // 1. 플레이어 패들 이동
+            if (playerMoveUp) {
+                player.y -= PADDLE_SPEED;
+            } else if (playerMoveDown) {
+                player.y += PADDLE_SPEED;
+            }
+            
+            // 경계 충돌 방지
+            player.y = Math.max(0, Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT, player.y));
+
+            // 2. AI 패들 이동
+            aiMovement();
+
+            // 3. 공 이동
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // 4. 벽 충돌 (상하)
+            if (ball.y < 0 || ball.y + BALL_SIZE > CANVAS_HEIGHT) {
+                ball.dy *= -1; // 방향 반전
+            }
+
+            // 5. 패들 충돌
+            checkPaddleCollision(player);
+            checkPaddleCollision(ai);
+
+            // 6. 득점 (좌우 벽 통과)
+            if (ball.x < 0) {
+                // AI 득점
+                aiScore++;
+                updateScores();
+                checkWin();
+                if (isGameActive) {
+                    ball.reset();
+                }
+            } else if (ball.x + BALL_SIZE > CANVAS_WIDTH) {
+                // 플레이어 득점
+                playerScore++;
+                updateScores();
+                checkWin();
+                if (isGameActive) {
+                    ball.reset();
+                }
+            }
+        }
+
+        // AI 패들 로직
+        function aiMovement() {
+            const center = ai.y + ai.height / 2;
+            const ballCenter = ball.y + ball.size / 2;
+            
+            // 공의 위치에 따라 패들을 이동
+            if (ballCenter < center) {
+                // 공이 위쪽에 있으면 위로 이동
+                ai.y -= PADDLE_SPEED * AI_DIFFICULTY * Math.abs(center - ballCenter);
+            } else if (ballCenter > center) {
+                // 공이 아래쪽에 있으면 아래로 이동
+                ai.y += PADDLE_SPEED * AI_DIFFICULTY * Math.abs(center - ballCenter);
+            }
+            
+            // 경계 충돌 방지
+            ai.y = Math.max(0, Math.min(CANVAS_HEIGHT - PADDLE_HEIGHT, ai.y));
+        }
+
+        // 패들 충돌 처리
+        function checkPaddleCollision(paddle) {
+            // AABB(Axis-Aligned Bounding Box) 충돌 감지
+            if (ball.x < paddle.x + paddle.width &&
+                ball.x + ball.size > paddle.x &&
+                ball.y < paddle.y + paddle.height &&
+                ball.y + ball.size > paddle.y) {
+                
+                // 수평 방향 반전
+                ball.dx *= -1; 
+                
+                // 공의 속도 증가
+                ball.speed = Math.min(ball.speed + 0.5, 10);
+                
+                // 충돌 지점에 따른 수직 방향 계산 (패들의 중심에서 멀수록 수직 속도가 커짐)
+                let collidePoint = (ball.y + ball.size / 2) - (paddle.y + paddle.height / 2);
+                collidePoint = collidePoint / (paddle.height / 2); // -1에서 1 사이의 값으로 정규화
+                
+                ball.dy = ball.speed * collidePoint;
+            }
+        }
+
+        // --- UI 및 게임 상태 관리 ---
+
+        function updateScores() {
+            playerScoreDisplay.innerHTML = `<i class="fas fa-user mr-2"></i> 내 점수: ${playerScore}`;
+            aiScoreDisplay.innerHTML = `<i class="fas fa-robot mr-2"></i> AI 점수: ${aiScore}`;
+        }
+        
+        function checkWin() {
+            if (playerScore >= MAX_SCORE || aiScore >= MAX_SCORE) {
+                isGameActive = false;
+                isGameOver = true;
+                cancelAnimationFrame(animationFrame);
+                
+                const winner = playerScore >= MAX_SCORE ? "당신" : "AI";
+                statusElement.textContent = `게임 종료! ${winner} 승리! 🎉`;
+                startButton.textContent = "다시 시작";
+            }
+        }
+
+        function startGame() {
+            if (!isGameActive || isGameOver) {
+                initializeGame();
+            }
+            
+            isGameActive = true;
+            isGameOver = false;
+            statusElement.textContent = "게임 진행 중...";
+            startButton.textContent = "일시 정지 (Space)";
+            
+            gameLoop();
+        }
+
+        function togglePause() {
+            if (isGameOver) return; 
+
+            if (isGameActive) {
+                isGameActive = false;
+                cancelAnimationFrame(animationFrame);
+                statusElement.textContent = "일시 정지 ⏸️";
+                startButton.textContent = "재개";
+            } else { // 재개
+                isGameActive = true;
+                statusElement.textContent = "게임 진행 중...";
+                startButton.textContent = "일시 정지 (Space)";
+                gameLoop();
+            }
+        }
+
+        // --- 키보드 입력 처리 ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+            
+            if (!isGameActive) return;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    playerMoveUp = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    playerMoveDown = true;
+                    e.preventDefault();
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (!isGameActive) return;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    playerMoveUp = false;
+                    break;
+                case 'ArrowDown':
+                    playerMoveDown = false;
+                    break;
+            }
+        });
+
+
+        // --- 초기화 및 이벤트 연결 ---
+        startButton.addEventListener('click', () => {
+             if (startButton.textContent === '게임 시작' || startButton.textContent === '다시 시작') {
+                startGame();
+            } else {
+                togglePause();
+            }
+        });
+
+        // 페이지 로드 시 초기화
+        initializeGame();
+    </script>
 </body>
 </html>
