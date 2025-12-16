@@ -115,6 +115,7 @@
         let score = 0;
         let gameLoop;
         let isGameActive = false;
+        let isGameOver = false; // 게임 오버 상태 추적 변수
         let changingDirection = false; // 방향 전환 중 중복 입력 방지
         let currentSpeed = INITIAL_SPEED;
 
@@ -127,6 +128,7 @@
             score = 0;
             currentSpeed = INITIAL_SPEED;
             isGameActive = false;
+            isGameOver = false; // 명시적 초기화
             changingDirection = false;
             
             clearInterval(gameLoop);
@@ -261,14 +263,18 @@
         // --- 게임 관리 ---
 
         function startGame() {
-            if (isGameActive) {
+            // 게임 오버 상태이거나, 초기 상태일 때만 초기화 후 시작
+            if (isGameOver || startButton.textContent === '게임 시작' || startButton.textContent === '다시 시작') {
                 initializeGame();
             }
             
             isGameActive = true;
+            isGameOver = false; // 게임 시작 시 게임 오버 상태 해제
             statusElement.textContent = "게임 진행 중...";
             startButton.textContent = "일시 정지 (Space)";
             
+            // gameLoop 재설정
+            clearInterval(gameLoop); 
             gameLoop = setInterval(gameTick, currentSpeed);
         }
 
@@ -280,6 +286,7 @@
 
         function gameOver() {
             isGameActive = false;
+            isGameOver = true; // 게임 오버 상태 설정
             clearInterval(gameLoop);
             statusElement.textContent = "게임 오버! 💀";
             startButton.textContent = "다시 시작";
@@ -308,15 +315,19 @@
 
             switch (keyPressed) {
                 case 'ArrowLeft':
+                case 'a':
                     if (!GOING_RIGHT) { newDx = -1; newDy = 0; }
                     break;
                 case 'ArrowUp':
+                case 'w':
                     if (!GOING_DOWN) { newDx = 0; newDy = -1; }
                     break;
                 case 'ArrowRight':
+                case 'd':
                     if (!GOING_LEFT) { newDx = 1; newDy = 0; }
                     break;
                 case 'ArrowDown':
+                case 's':
                     if (!GOING_UP) { newDx = 0; newDy = 1; }
                     break;
                 default:
@@ -333,12 +344,15 @@
         }
         
         function togglePause() {
+            // 게임 오버 상태가 아닐 때만 일시 정지/재개 가능
+            if (isGameOver) return; 
+
             if (isGameActive) {
                 isGameActive = false;
                 clearInterval(gameLoop);
                 statusElement.textContent = "일시 정지 ⏸️";
                 startButton.textContent = "재개";
-            } else if (!isGameOver) {
+            } else { // 재개
                 isGameActive = true;
                 statusElement.textContent = "게임 진행 중...";
                 startButton.textContent = "일시 정지 (Space)";
@@ -348,9 +362,10 @@
 
         // --- 초기화 및 이벤트 연결 ---
         startButton.addEventListener('click', () => {
+            // 버튼 텍스트에 따라 명확하게 분기
             if (startButton.textContent === '게임 시작' || startButton.textContent === '다시 시작') {
                 startGame();
-            } else {
+            } else if (startButton.textContent === '재개' || startButton.textContent.includes('일시 정지')) {
                 togglePause();
             }
         });
