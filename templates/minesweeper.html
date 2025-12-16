@@ -17,6 +17,9 @@
             border: 4px solid #334155;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             margin: 0 auto;
+            /* 10x10 보드의 고정 너비 지정 (30px * 10칸 + 보더 여유분) */
+            width: 308px; /* 너비가 줄어드는 문제 해결 */
+            height: 308px;
         }
         /* 각 셀 스타일 */
         .cell {
@@ -181,7 +184,8 @@
                     });
                     // 좌클릭 로직 연결 (셀 열기)
                     cell.addEventListener('click', () => {
-                        if (gameActive || cellsRevealed === 0) { // 게임 시작 전에도 첫 클릭 허용
+                        // 게임 시작 전 (cellsRevealed === 0)에도 클릭 허용
+                        if (gameActive || cellsRevealed === 0) { 
                             handleClick(r, c);
                         }
                     });
@@ -227,7 +231,7 @@
                 timerElement.textContent = `시간: ${timeElapsed}`;
             }, 1000);
 
-            // 첫 클릭 처리
+            // 첫 클릭 처리 (안전한 칸이므로 바로 열기)
             revealCell(r, c);
         }
 
@@ -246,6 +250,8 @@
                 cellData.isRevealed = true;
                 gameOver(false); // 패배
             } else {
+                // 이 부분이 이전에 클릭 무반응의 원인이었을 수 있습니다.
+                // 첫 클릭이 아닌 이후 클릭은 바로 revealCell을 호출합니다.
                 revealCell(r, c);
                 checkWin();
             }
@@ -258,17 +264,20 @@
             if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
             
             const cellData = boardData[r][c];
-            if (cellData.isRevealed || cellData.isMine || cellData.isFlagged) return;
             
+            // 이미 열렸거나, 지뢰이거나, 깃발이 있다면 리턴 (지뢰는 handleClick에서만 처리)
+            if (cellData.isRevealed || cellData.isFlagged || cellData.isMine) return;
+            
+            // 여기서 cellsRevealed를 증가시키는 것이 중요합니다.
             cellData.isRevealed = true;
-            cellsRevealed++;
+            cellsRevealed++; // <--- 카운트 증가
 
             if (cellData.neighborMines === 0) {
                 // 주변 지뢰가 0개면 주변 8칸도 열기 (재귀 호출)
                 for (let dr = -1; dr <= 1; dr++) {
                     for (let dc = -1; dc <= 1; dc++) {
                         if (dr !== 0 || dc !== 0) {
-                            revealCell(r + dr, c + dc);
+                            revealCell(r + dr, c + dc); // 재귀 호출
                         }
                     }
                 }
@@ -277,7 +286,7 @@
         
         // 깃발 토글
         function toggleFlag(r, c) {
-            if (!gameActive) return; // 게임 시작 전에 깃발 금지
+            if (!gameActive) return;
 
             const cellData = boardData[r][c];
             if (cellData.isRevealed) return;
@@ -303,6 +312,7 @@
         function gameOver(isWin) {
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             
             if (isWin) {
                 statusElement.textContent = `승리! 🎉 (${timeElapsed}초)`;
@@ -343,8 +353,9 @@
             timeElapsed = 0;
             minesFlagged = 0;
             cellsRevealed = 0;
-
-            boardElement.style.width = `${COLS * 30 + 8}px`; 
+            
+            // CSS에서 고정 너비를 주었으므로 이 코드는 제거해도 됩니다.
+            // boardElement.style.width = `${COLS * 30 + 8}px`; 
             
             statusElement.textContent = "게임을 시작하세요! (첫 클릭 시 지뢰 배치)";
             minesLeftElement.innerHTML = `<i class="fas fa-bomb mr-2"></i> 지뢰: ${MINES}`;
