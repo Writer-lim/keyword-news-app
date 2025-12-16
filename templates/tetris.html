@@ -1,3 +1,4 @@
+// [tetris.html 파일 전체 코드]
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -59,6 +60,16 @@
                 <div id="status" class="text-red-600 font-bold">대기 중...</div>
             </div>
 
+            <div class="mb-4 text-sm text-gray-700">
+                <h3 class="font-bold mb-1">🎮 조작 키</h3>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li>**이동**: ←/→ (A/D)</li>
+                    <li>**회전**: ↑ (W)</li>
+                    <li>**소프트 드롭**: ↓ (S)</li>
+                    <li>**하드 드롭**: Space (스페이스 바)</li>
+                </ul>
+            </div>
+            
             <div class="mb-4">
                 <h3 class="text-lg font-bold mb-2 text-gray-700">다음 블록</h3>
                 <div id="next-piece-container" class="bg-gray-200 p-2 rounded-md flex justify-center items-center h-24">
@@ -134,7 +145,7 @@
             nextPieceContainer.innerHTML = '';
             
             renderBoard();
-            newPiece(); // 첫 블록과 다음 블록 준비
+            newPiece(true); // 첫 블록과 다음 블록 준비 (true: 강제 생성)
         }
 
         // 보드 DOM 요소 생성 및 스타일 설정
@@ -158,9 +169,9 @@
         // --- 핵심 로직 ---
 
         // 새로운 블록 생성
-        function newPiece() {
+        function newPiece(isInitial = false) {
             // 다음 블록을 현재 블록으로 사용하거나, 무작위 블록 생성
-            if (!nextPiece) {
+            if (!nextPiece || isInitial) {
                 const randomIndex = Math.floor(Math.random() * TETROMINOES.length);
                 nextPiece = JSON.parse(JSON.stringify(TETROMINOES[randomIndex]));
             }
@@ -171,13 +182,17 @@
             nextPiece = JSON.parse(JSON.stringify(TETROMINOES[nextRandomIndex]));
             renderNextPiece();
 
-            // 블록 초기 위치 설정 (중앙 상단)
+            // 블록 초기 위치 수정: 화면 밖 (row = -1 혹은 -2)에서 시작하도록 수정
             const dim = currentPiece.shape.length;
-            currentPiece.row = 0;
+            let initialRow = -2; 
+            // O 블록 같은 2x2 블록은 -2에서 시작하면 보드에 닿지 않을 수 있으므로 조정
+            if (dim === 2) initialRow = 0; 
+
+            currentPiece.row = initialRow; 
             currentPiece.col = Math.floor(COLS / 2) - Math.floor(dim / 2);
 
-            // 시작하자마자 충돌하면 게임 오버
-            if (checkCollision(0, 0, currentPiece.shape)) {
+            // 시작하자마자 충돌하면 게임 오버 (첫 블록 이후에만 검사)
+            if (!isInitial && checkCollision(0, 0, currentPiece.shape)) {
                 gameOver();
                 return;
             }
@@ -195,14 +210,23 @@
                         const targetRow = pieceRow + r;
                         const targetCol = pieceCol + c;
 
-                        // 1. 벽이나 바닥과 충돌하는 경우
-                        if (targetCol < 0 || targetCol >= COLS || targetRow >= ROWS) {
+                        // 1. 좌우 벽과 충돌하는 경우
+                        if (targetCol < 0 || targetCol >= COLS) {
                             return true;
                         }
-                        // 2. 이미 쌓인 블록과 충돌하는 경우 (보드 경계 밖의 충돌은 무시)
-                        if (targetRow >= 0 && targetRow < ROWS && targetCol >= 0 && targetCol < COLS && grid[targetRow][targetCol] !== 0) {
+                        // 2. 바닥과 충돌하는 경우
+                        if (targetRow >= ROWS) {
                             return true;
                         }
+                        
+                        // 3. 이미 쌓인 블록과 충돌하는 경우
+                        // targetRow가 화면 내부(0 <= r < ROWS)일 때만 grid 검사
+                        if (targetRow >= 0) { 
+                             if (grid[targetRow][targetCol] !== 0) {
+                                return true;
+                            }
+                        }
+                        // targetRow < 0 인 경우는 충돌 검사를 무시하고 통과시킴 (수정된 부분)
                     }
                 }
             }
@@ -244,7 +268,7 @@
                 }
             }
             
-            // 회전 후 충돌 검사
+            // 회전 후 충돌 검사 (벽차기 kick 로직은 일단 생략)
             if (!checkCollision(0, 0, newShape)) {
                 draw(true); // 기존 블록 지우기
                 currentPiece.shape = newShape;
@@ -263,7 +287,7 @@
                         const targetRow = currentPiece.row + r;
                         const targetCol = currentPiece.col + c;
 
-                        // 화면 위로 넘어간 블록은 무시 (하지만 게임 오버 로직이 이미 처리함)
+                        // 화면 위로 넘어간 블록도 고정하지 않고 무시 (게임 오버는 newPiece에서 처리)
                         if (targetRow >= 0) {
                             grid[targetRow][targetCol] = currentPiece.color;
                         }
@@ -311,6 +335,7 @@
                         const targetRow = currentPiece.row + r;
                         const targetCol = currentPiece.col + c;
 
+                        // 화면 안에 있는 셀만 그리기/지우기
                         if (targetRow >= 0 && targetRow < ROWS && targetCol >= 0 && targetCol < COLS) {
                             const cellElement = boardElement.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`);
                             if (cellElement) {
@@ -396,6 +421,8 @@
             statusElement.textContent = "게임 진행 중...";
             startButton.textContent = "재시작";
             
+            // 초기 블록 바로 시작
+            gameTick();
             // 게임 루프 시작
             gameLoop = setInterval(gameTick, DROP_INTERVAL);
         }
@@ -404,7 +431,7 @@
             // 한 칸 아래로 이동
             if (!movePiece(1, 0)) {
                 // 이동 실패 시 (충돌)
-                lockPiece();
+                // lockPiece는 movePiece 안에서 처리됨
             }
         }
 
@@ -415,7 +442,9 @@
             statusElement.textContent = "게임 오버! 💀";
             startButton.textContent = "다시 시작";
             
-            // 패배 시 전체 화면 깜박이거나 블록 색상 변경 등의 시각 효과 추가 가능
+            // 게임 오버 시 현재 블록을 지움
+            draw(true);
+            
             console.log("Game Over. Final Score:", score);
         }
 
@@ -460,7 +489,8 @@
             }
             
             // 최종 위치로 이동 및 고정
-            movePiece(dropDistance, 0); // 한 칸씩 이동하는 movePiece를 활용하여 위치 업데이트
+            // 이 시점에서 블록은 화면에 그려져 있지 않을 수 있으므로 draw를 먼저 호출하여 지울 필요 없음
+            currentPiece.row += dropDistance;
             lockPiece();
             
             // 타이머 초기화 (다음 틱을 기다리지 않고 바로 다음 블록 시작)
