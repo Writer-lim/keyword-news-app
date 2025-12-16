@@ -6,17 +6,19 @@
     <title>지뢰 찾기 게임</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         body {
             font-family: 'Noto Sans KR', sans-serif;
             background-color: #f0f4f8;
         }
+        /* 게임 보드 스타일 */
         .game-grid {
             display: grid;
             border: 4px solid #334155;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             margin: 0 auto;
         }
+        /* 각 셀 스타일 */
         .cell {
             width: 30px;
             height: 30px;
@@ -37,6 +39,7 @@
             background-color: #f3f4f6; /* Gray-100 */
             cursor: default;
         }
+        /* 특수 셀 스타일 */
         .cell.mine {
             background-color: #ef4444; /* Red-500 */
             color: white;
@@ -44,6 +47,7 @@
         .cell.flagged {
             background-color: #22c55e; /* Green-500 */
             color: white;
+            font-size: 14px; /* 깃발 아이콘 크기 */
         }
         /* 숫자별 색상 */
         .count-1 { color: #2563eb; } /* Blue-600 */
@@ -127,7 +131,7 @@
 
                 // 첫 클릭 지점 주변 8칸에는 지뢰를 놓지 않음
                 if (!boardData[row][col].isMine && 
-                    Math.abs(row - initialRow) > 1 || Math.abs(col - initialCol) > 1) {
+                    (Math.abs(row - initialRow) > 1 || Math.abs(col - initialCol) > 1)) {
                     
                     boardData[row][col].isMine = true;
                     minesPlaced++;
@@ -170,13 +174,16 @@
                     cell.dataset.row = r;
                     cell.dataset.col = c;
                     
-                    // 우클릭 방지 및 지뢰찾기 로직 연결
+                    // 우클릭 방지 및 지뢰찾기 로직 연결 (깃발 토글)
                     cell.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         if (gameActive) toggleFlag(r, c);
                     });
+                    // 좌클릭 로직 연결 (셀 열기)
                     cell.addEventListener('click', () => {
-                        if (gameActive) handleClick(r, c);
+                        if (gameActive || cellsRevealed === 0) { // 게임 시작 전에도 첫 클릭 허용
+                            handleClick(r, c);
+                        }
                     });
 
                     updateCellDisplay(cell, cellData);
@@ -224,16 +231,16 @@
             revealCell(r, c);
         }
 
-        // 클릭 처리
+        // 클릭 처리 (핵심 로직)
         function handleClick(r, c) {
-            if (!gameActive) {
-                // 첫 클릭이라면 게임 시작
+            if (cellsRevealed === 0) {
+                // 첫 클릭이라면 게임 시작 (지뢰 배치 및 타이머 시작)
                 startGame(r, c);
                 return;
             }
 
             const cellData = boardData[r][c];
-            if (cellData.isRevealed || cellData.isFlagged) return;
+            if (!gameActive || cellData.isRevealed || cellData.isFlagged) return;
 
             if (cellData.isMine) {
                 cellData.isRevealed = true;
@@ -270,6 +277,8 @@
         
         // 깃발 토글
         function toggleFlag(r, c) {
+            if (!gameActive) return; // 게임 시작 전에 깃발 금지
+
             const cellData = boardData[r][c];
             if (cellData.isRevealed) return;
 
@@ -283,25 +292,10 @@
 
         // 승리 조건 확인
         function checkWin() {
-            // 1. 지뢰가 아닌 모든 셀이 열렸을 때
+            // 지뢰가 아닌 모든 셀이 열렸을 때
             const nonMineCells = ROWS * COLS - MINES;
             if (cellsRevealed === nonMineCells) {
                 gameOver(true);
-                return;
-            }
-
-            // 2. 모든 지뢰가 정확히 깃발로 표시되었을 때 (선택적 승리 조건)
-            // 지뢰가 아닌 곳에 깃발이 없으면서, 깃발 수가 지뢰 수와 같을 때
-            let correctFlags = 0;
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    if (boardData[r][c].isMine && boardData[r][c].isFlagged) {
-                        correctFlags++;
-                    }
-                }
-            }
-            if (correctFlags === MINES && minesFlagged === MINES) {
-                 gameOver(true);
             }
         }
         
@@ -312,13 +306,13 @@
             
             if (isWin) {
                 statusElement.textContent = `승리! 🎉 (${timeElapsed}초)`;
-                // 모든 지뢰에 깃발 표시 (승리 시)
+                // 승리 시 모든 지뢰에 깃발 표시
                 boardData.forEach(row => row.forEach(cell => {
                     if (cell.isMine && !cell.isFlagged) cell.isFlagged = true;
                 }));
             } else {
                 statusElement.textContent = "게임 오버! 💥";
-                // 모든 지뢰 공개 (패배 시)
+                // 패배 시 모든 지뢰 공개
                 boardData.forEach(row => row.forEach(cell => {
                     if (cell.isMine) cell.isRevealed = true;
                 }));
@@ -328,11 +322,15 @@
 
         // 전체 보드 화면 업데이트
         function updateBoardDisplay() {
-            boardElement.querySelectorAll('.cell').forEach(cellElement => {
-                const r = parseInt(cellElement.dataset.row);
-                const c = parseInt(cellElement.dataset.col);
-                updateCellDisplay(cellElement, boardData[r][c]);
-            });
+            // DOM에서 해당하는 셀 요소를 찾아서 상태 업데이트
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cellElement = boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                    if (cellElement) {
+                        updateCellDisplay(cellElement, boardData[r][c]);
+                    }
+                }
+            }
         }
 
         // 리셋 함수
@@ -341,20 +339,22 @@
             renderBoard();
             gameActive = false;
             clearInterval(timerInterval);
+            timerInterval = null;
             timeElapsed = 0;
             minesFlagged = 0;
             cellsRevealed = 0;
 
-            boardElement.style.width = `${COLS * 30 + 8}px`; // 셀 크기 + 보더 고려
+            boardElement.style.width = `${COLS * 30 + 8}px`; 
             
             statusElement.textContent = "게임을 시작하세요! (첫 클릭 시 지뢰 배치)";
             minesLeftElement.innerHTML = `<i class="fas fa-bomb mr-2"></i> 지뢰: ${MINES}`;
             timerElement.textContent = `시간: 0`;
         }
 
+        // --- 초기화 및 이벤트 리스너 ---
         resetButton.addEventListener('click', resetGame);
-
-        // 초기 실행
+        
+        // 페이지 로드 시 초기화
         resetGame();
     </script>
 </body>
