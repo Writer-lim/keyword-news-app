@@ -1,97 +1,4 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>테트리스 게임</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: #f0f4f8;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        /* 게임 보드 스타일 */
-        .tetris-grid {
-            display: grid;
-            border: 4px solid #334155;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            background-color: #1e293b; /* Slate-800 배경 */
-            margin: 0 auto;
-        }
-        .cell {
-            width: 30px;
-            height: 30px;
-            border: 1px solid #334155;
-            box-sizing: border-box;
-            background-color: transparent;
-            transition: background-color 0.05s ease; /* 블록 이동 시 부드럽게 */
-        }
-        
-        /* 블록 색상 정의 (Tailwind palette 사용) */
-        .I { background-color: #06b6d4; } /* Cyan */
-        .O { background-color: #f59e0b; } /* Amber */
-        .T { background-color: #a855f7; } /* Purple */
-        .J { background-color: #3b82f6; } /* Blue */
-        .L { background-color: #f97316; } /* Orange */
-        .S { background-color: #22c55e; } /* Green */
-        .Z { background-color: #ef4444; } /* Red */
-        .transparent { background-color: transparent !important; } /* 투명 */
-    </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-</head>
-<body onkeydown="handleKeyDown(event)">
-
-    <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col md:flex-row gap-6">
-        
-        <div class="w-full md:w-56 p-4 bg-gray-100 rounded-lg flex flex-col justify-between">
-            <h1 class="text-3xl font-bold text-center mb-4 text-gray-800">🧱 테트리스</h1>
-
-            <div class="text-xl font-semibold mb-4 space-y-2">
-                <div id="score-display" class="text-green-600"><i class="fas fa-star mr-2"></i> 점수: 0</div>
-                <div id="lines-display" class="text-indigo-600"><i class="fas fa-stream mr-2"></i> 줄 수: 0</div>
-                <div id="status" class="text-red-600 font-bold">대기 중...</div>
-            </div>
-
-            <div class="mb-4 text-sm text-gray-700">
-                <h3 class="font-bold mb-1">🎮 조작 키</h3>
-                <ul class="list-disc list-inside space-y-0.5">
-                    <li>**이동**: ←/→ (A/D)</li>
-                    <li>**회전**: ↑ (W)</li>
-                    <li>**소프트 드롭**: ↓ (S)</li>
-                    <li>**하드 드롭**: Space (스페이스 바)</li>
-                </ul>
-            </div>
-            
-            <div class="mb-4">
-                <h3 class="text-lg font-bold mb-2 text-gray-700">다음 블록</h3>
-                <div id="next-piece-container" class="bg-gray-200 p-2 rounded-md flex justify-center items-center h-24">
-                    </div>
-            </div>
-
-            <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95">
-                게임 시작
-            </button>
-        </div>
-
-        <div id="board-container">
-            <div id="board" class="tetris-grid">
-                </div>
-        </div>
-    </div>
-
-    <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
-        ← 메인 검색 페이지로 돌아가기
-    </a>
-
-    <script>
+<script>
         // --- 테트리스 게임 설정 ---
         const ROWS = 20;
         const COLS = 10;
@@ -177,8 +84,8 @@
             renderNextPiece();
 
             const dim = currentPiece.shape.length;
-            let initialRow = -2; // 대부분의 블록은 화면 밖 -2에서 시작
-            if (dim === 2) initialRow = 0; // O 블록 같은 2x2 블록은 0에서 시작
+            let initialRow = -2; 
+            if (dim === 2) initialRow = 0; 
 
             currentPiece.row = initialRow; 
             currentPiece.col = Math.floor(COLS / 2) - Math.floor(dim / 2);
@@ -204,7 +111,6 @@
                             return true;
                         }
                         
-                        // 화면 내부에 있는 셀만 이미 고정된 블록과 충돌하는지 확인
                         if (targetRow >= 0 && targetRow < ROWS && grid[targetRow][targetCol] !== 0) { 
                             return true;
                         }
@@ -258,13 +164,16 @@
                         const targetRow = currentPiece.row + r;
                         const targetCol = currentPiece.col + c;
 
-                        if (targetRow >= 0) { // 화면 안에 있는 블록만 격자에 고정
+                        if (targetRow >= 0) { 
                             grid[targetRow][targetCol] = currentPiece.color;
                         }
                     }
                 }
             }
 
+            // 블록이 고정되었으므로, 화면에 고정된 블록(grid)을 다시 그려줍니다.
+            updateBoardDisplay(); 
+            
             clearLines();
             newPiece();
         }
@@ -286,15 +195,17 @@
                 linesCleared += lines;
                 scoreDisplay.textContent = `점수: ${score}`;
                 linesDisplay.textContent = `줄 수: ${linesCleared}`;
+                
+                // 줄이 지워졌다면 고정된 블록을 다시 그려야 합니다.
+                updateBoardDisplay(); 
             }
         }
 
-        // 블록을 그리거나 지우는 함수 (수정: 클래스와 style.backgroundColor 병행)
+        // 현재 움직이는 블록만 그리기/지우기 (고정된 블록은 updateBoardDisplay가 담당)
         function draw(erase = false) {
             const shape = currentPiece.shape;
             const dim = shape.length;
             const colorClass = currentPiece.color;
-            const colorValue = erase ? '' : getComputedStyle(document.documentElement).getPropertyValue('--tw-color-' + colorClass) || colorClass;
 
             for (let r = 0; r < dim; r++) {
                 for (let c = 0; c < dim; c++) {
@@ -305,23 +216,26 @@
                         if (targetRow >= 0 && targetRow < ROWS && targetCol >= 0 && targetCol < COLS) {
                             const cellElement = boardElement.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`);
                             if (cellElement) {
-                                // 기존 색상 클래스 모두 제거 (안전성 확보)
+                                // 1. 모든 색상 클래스 제거 (안전성을 위해)
                                 TETROMINOES.forEach(t => cellElement.classList.remove(t.color));
 
                                 if (erase) {
-                                    // 지우기: 배경색 초기화 (CSS로 설정된 #1e293b 배경색이 나타남)
+                                    // 2. 지우기: 배경색 초기화 (CSS 배경색이 나타남)
                                     cellElement.style.backgroundColor = ''; 
                                 } else {
-                                    // 그리기: 해당 블록의 색상 클래스 추가
-                                    cellElement.classList.add(colorClass); 
+                                    // 2. 그리기: 해당 블록의 색상 클래스 추가
+                                    // **주의: 이 셀은 grid에 저장된 셀이 아니어야 함 (움직이는 블록)**
+                                    // 움직이는 블록이 고정된 블록 위에 그려지는 경우를 대비해, grid가 비어있을 때만 그리도록 하면 안 됨
+                                    // grid가 비어있는 경우(0)에만 그리기 로직을 넣겠습니다.
+                                    if (grid[targetRow][targetCol] === 0) {
+                                        cellElement.classList.add(colorClass); 
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-
-            updateBoardDisplay(); 
         }
 
         // 고정된 블록을 화면에 그리는 함수
@@ -330,14 +244,13 @@
                 for (let c = 0; c < COLS; c++) {
                     const cellElement = boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
                     if (cellElement) {
-                        // 모든 색상 클래스 제거
                         TETROMINOES.forEach(t => cellElement.classList.remove(t.color));
                         
                         const colorName = grid[r][c];
                         if (colorName !== 0) {
                             cellElement.classList.add(colorName);
                         } else {
-                            // 셀이 비어 있으면 배경색 초기화 (CSS 배경색인 #1e293b가 보이도록)
+                            // 비어있는 셀은 배경색 초기화
                              cellElement.style.backgroundColor = ''; 
                         }
                     }
@@ -385,16 +298,20 @@
             statusElement.textContent = "게임 진행 중...";
             startButton.textContent = "재시작";
             
-            // 초기 블록을 즉시 그리기
-            draw();
-            // 게임 루프 시작
+            // 1. 초기 블록을 그리기 전에 고정된 블록 상태를 먼저 화면에 반영합니다.
+            updateBoardDisplay(); 
+
+            // 2. 초기 블록을 그립니다.
+            draw(); 
+
+            // 3. 게임 루프 시작
             gameLoop = setInterval(gameTick, DROP_INTERVAL);
         }
 
         function gameTick() {
             // 한 칸 아래로 이동
             if (!movePiece(1, 0)) {
-                // lockPiece는 movePiece 안에서 처리됨
+                // 이동 실패 (충돌) 시 lockPiece가 호출됩니다.
             }
         }
 
@@ -405,7 +322,8 @@
             statusElement.textContent = "게임 오버! 💀";
             startButton.textContent = "다시 시작";
             
-            draw(true);
+            // 게임 오버 시 현재 블록을 지웁니다.
+            draw(true); 
             
             console.log("Game Over. Final Score:", score);
         }
@@ -448,8 +366,11 @@
                 dropDistance++;
             }
             
+            // 기존 블록 지우기 (충돌 지점까지 이동하기 전)
+            draw(true); 
+            
             currentPiece.row += dropDistance;
-            lockPiece();
+            lockPiece(); // lockPiece 내부에서 updateBoardDisplay와 newPiece가 호출됨
             
             clearInterval(gameLoop);
             gameLoop = setInterval(gameTick, DROP_INTERVAL);
@@ -460,5 +381,3 @@
         
         initializeGame();
     </script>
-</body>
-</html>
