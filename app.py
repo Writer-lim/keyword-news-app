@@ -1,3 +1,5 @@
+[app.py]
+
 import os
 import requests
 from flask import Flask, render_template, request, jsonify
@@ -17,7 +19,7 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "_ZBcX8Ec50")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGg9h2sPSM") 
 
 # =========================================================================
-# 2. 페이지 라우트
+# 2. 페이지 라우트 (수정된 부분: 5개 게임 라우트 추가)
 # =========================================================================
 
 @app.route('/')
@@ -29,6 +31,31 @@ def index():
 def tictactoe_game():
     """틱택토 게임 페이지를 렌더링합니다."""
     return render_template('tictactoe.html')
+
+@app.route('/game/minesweeper')
+def minesweeper_game():
+    """지뢰 찾기 게임 페이지를 렌더링합니다."""
+    return render_template('minesweeper.html') 
+
+@app.route('/game/memory')
+def memory_game():
+    """메모리 게임 페이지를 렌더링합니다."""
+    return render_template('memory.html') 
+
+@app.route('/game/snake')
+def snake_game():
+    """뱀 게임 페이지를 렌더링합니다."""
+    return render_template('snake.html') 
+
+@app.route('/game/pong')
+def pong_game():
+    """퐁 게임 페이지를 렌더링합니다."""
+    return render_template('pong.html') 
+
+@app.route('/game/tetris')
+def tetris_game():
+    """테트리스 게임 페이지를 렌더링합니다."""
+    return render_template('tetris.html')
 
 # =========================================================================
 # 3. 네이버 뉴스 검색 API 엔드포인트

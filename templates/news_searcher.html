@@ -39,22 +39,56 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Header & Navigation -->
     <header class="container mx-auto py-4 flex justify-between items-center border-b border-gray-200 mb-8">
         <h1 class="text-3xl font-extrabold text-gray-900">
             <i class="fas fa-search text-indigo-500 mr-2"></i> 통합 미디어 검색기
         </h1>
-        <a href="/game/tictactoe" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-full shadow-md transition-colors transform hover:scale-105 active:scale-95">
-            <i class="fas fa-gamepad mr-2"></i> 틱택토 게임하기
-        </a>
-    </header>
+        
+        <div class="relative inline-block text-left" x-data="{ open: false }" @click.outside="open = false">
+            <button @click="open = !open" id="dropdown-button"
+                    class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-full shadow-md transition-colors transform hover:scale-105 active:scale-95 flex items-center">
+                <i class="fas fa-gamepad mr-2"></i> 게임 
+                <i class="ml-2 fas" :class="{'fa-caret-up': open, 'fa-caret-down': !open}"></i>
+            </button>
+        
+            <div x-show="open" 
+                 x-transition:enter="transition ease-out duration-100"
+                 x-transition:enter-start="transform opacity-0 scale-95"
+                 x-transition:enter-end="transform opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-75"
+                 x-transition:leave-start="transform opacity-100 scale-100"
+                 x-transition:leave-end="transform opacity-0 scale-95"
+                 class="origin-top-right absolute right-0 mt-2 w-60 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                 role="menu" aria-orientation="vertical" aria-labelledby="dropdown-button">
+                <div class="py-1" role="none">
+                    <a href="/game/tictactoe" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-xmark mr-2 text-red-500"></i> 1. 틱택토 (Tic-Tac-Toe)
+                    </a>
+                    <a href="/game/minesweeper" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-bomb mr-2 text-gray-600"></i> 2. 지뢰 찾기 (Minesweeper)
+                    </a>
+                    <a href="/game/memory" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-brain mr-2 text-purple-500"></i> 3. 메모리 게임 (Memory Game)
+                    </a>
+                    <a href="/game/snake" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-worm mr-2 text-green-600"></i> 4. 뱀 게임 (Snake Game)
+                    </a>
+                    <a href="/game/pong" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-table-tennis-paddle-ball mr-2 text-orange-500"></i> 5. 퐁 (Pong)
+                    </a>
+                    <a href="/game/tetris" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-indigo-600" role="menuitem">
+                        <i class="fas fa-th-large mr-2 text-sky-500"></i> 6. 테트리스 (Tetris)
+                    </a>
+                </div>
+            </div>
+        </div>
+        </header>
 
-    <!-- Main Search Area -->
     <main class="container mx-auto">
         <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-10">
             <div class="flex flex-col sm:flex-row gap-4">
                 <input type="text" id="search-input" placeholder="검색할 키워드를 입력하세요 (예: 제미나이)" 
-                       class="flex-grow p-3 border-2 border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg">
+                        class="flex-grow p-3 border-2 border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg">
                 <button onclick="performSearch()" id="search-button"
                         class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-colors flex items-center justify-center disabled:opacity-50">
                     <i class="fas fa-bolt mr-2"></i> 통합 검색 실행
@@ -66,10 +100,8 @@
             </div>
         </div>
 
-        <!-- Results Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            <!-- News Results Column -->
             <div class="space-y-4">
                 <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-red-500 pb-2 flex items-center">
                     <i class="fas fa-newspaper text-red-500 mr-2"></i> 네이버 뉴스
@@ -79,7 +111,6 @@
                 </div>
             </div>
 
-            <!-- Image Results Column -->
             <div class="space-y-4">
                 <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-green-500 pb-2 flex items-center">
                     <i class="fas fa-image text-green-500 mr-2"></i> 네이버 이미지
@@ -89,7 +120,6 @@
                 </div>
             </div>
 
-            <!-- YouTube Results Column -->
             <div class="space-y-4">
                 <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-blue-500 pb-2 flex items-center">
                     <i class="fab fa-youtube text-blue-500 mr-2"></i> 유튜브 영상
@@ -101,6 +131,8 @@
         </div>
     </main>
 
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
     <script>
         // DOM 요소 참조
         const searchInput = document.getElementById('search-input');
@@ -159,8 +191,8 @@
                 <div class="result-card bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 hover:border-green-500 transition-all">
                     <a href="${item.link}" target="_blank" class="block">
                         <img src="${item.thumbnail}" alt="${decodeHTMLEntities(item.title)}" 
-                             class="w-full h-32 object-cover" 
-                             onerror="this.onerror=null; this.src='https://placehold.co/150x150/e0f2f7/065f46?text=No+Image'"
+                                class="w-full h-32 object-cover" 
+                                onerror="this.onerror=null; this.src='https://placehold.co/150x150/e0f2f7/065f46?text=No+Image'"
                         >
                         <div class="p-2">
                             <p class="text-xs text-gray-600 line-clamp-1">${decodeHTMLEntities(item.title)}</p>
@@ -205,7 +237,6 @@
         async function performSearch() {
             const query = searchInput.value.trim();
             if (!query) {
-                // alert() 대신 메시지 박스를 사용해야 하지만, 현재는 console.log로 대체
                 console.log('검색 키워드를 입력해 주세요.');
                 return;
             }
