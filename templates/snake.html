@@ -2,21 +2,361 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>뱀꼬리잡기</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>뱀 게임 (Snake Game)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="p-8 flex flex-col items-center justify-center min-h-screen bg-gray-50">
-    <div class="bg-white p-8 rounded-xl shadow-2xl text-center">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">뱀꼬리잡기</h1>
-        <p class="text-lg text-red-500 mb-6">아직 게임 코드가 들어가지 않았습니다!</p>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
         
-        <div class="w-64 h-64 bg-gray-200 flex items-center justify-center text-gray-500">
-            [🚧 게임 영역 🚧]
+        /* 게임 보드 스타일 */
+        #game-board {
+            display: grid;
+            border: 4px solid #334155;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            background-color: #1e293b; /* Slate-800 배경 */
+            margin: 0 auto;
+        }
+
+        /* 셀 기본 스타일 */
+        .cell {
+            width: 20px;
+            height: 20px;
+            box-sizing: border-box;
+        }
+
+        /* 뱀 스타일 */
+        .snake-head {
+            background-color: #10b981; /* Emerald-500 */
+            border: 1px solid #059669;
+            border-radius: 4px;
+        }
+        .snake-body {
+            background-color: #059669; /* Emerald-600 */
+            border-radius: 2px;
+        }
+
+        /* 사과 (먹이) 스타일 */
+        .food {
+            background-color: #ef4444; /* Red-500 */
+            border-radius: 50%;
+            animation: pulse 1s infinite alternate;
+        }
+
+        /* 깜빡임 애니메이션 */
+        @keyframes pulse {
+            from { transform: scale(0.9); }
+            to { transform: scale(1.1); }
+        }
+        
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body onkeydown="handleKeyDown(event)">
+
+    <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col md:flex-row gap-6">
+        
+        <div class="w-full md:w-56 p-4 bg-gray-100 rounded-lg flex flex-col justify-between">
+            <h1 class="text-3xl font-bold text-center mb-4 text-gray-800">🐍 뱀 게임</h1>
+
+            <div class="text-xl font-semibold mb-4 space-y-2">
+                <div id="score-display" class="text-green-600"><i class="fas fa-apple-alt mr-2"></i> 점수: 0</div>
+                <div id="status" class="text-red-600 font-bold">대기 중...</div>
+            </div>
+
+            <div class="mb-4 text-sm text-gray-700">
+                <h3 class="font-bold mb-1">🎮 조작 키</h3>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li>**이동**: ←, ↑, →, ↓ (방향키)</li>
+                    <li>**멈춤/재개**: Space (스페이스 바)</li>
+                </ul>
+            </div>
+
+            <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95">
+                게임 시작
+            </button>
         </div>
 
-        <a href="/" class="block mt-8 text-indigo-500 hover:text-indigo-700 font-medium">
-            ← 메인 검색 페이지로 돌아가기
-        </a>
+        <div id="board-container" class="flex items-center justify-center">
+            <div id="game-board">
+                </div>
+        </div>
     </div>
+
+    <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
+        ← 메인 검색 페이지로 돌아가기
+    </a>
+
+    <script>
+        // --- 게임 설정 ---
+        const GRID_SIZE = 20; // 20x20 격자
+        const INITIAL_SPEED = 150; // 초기 속도 (ms 당 이동)
+
+        // --- DOM 요소 ---
+        const boardElement = document.getElementById('game-board');
+        const scoreDisplay = document.getElementById('score-display');
+        const statusElement = document.getElementById('status');
+        const startButton = document.getElementById('start-button');
+
+        // --- 게임 상태 변수 ---
+        let snake;
+        let food;
+        let dx = 1; // x 방향 이동량 (1: 오른쪽, -1: 왼쪽)
+        let dy = 0; // y 방향 이동량 (1: 아래, -1: 위)
+        let score = 0;
+        let gameLoop;
+        let isGameActive = false;
+        let changingDirection = false; // 방향 전환 중 중복 입력 방지
+        let currentSpeed = INITIAL_SPEED;
+
+        // --- 초기화 및 렌더링 ---
+
+        function initializeGame() {
+            snake = [{x: 10, y: 10}, {x: 9, y: 10}]; // 초기 뱀 (머리, 몸통)
+            dx = 1; 
+            dy = 0;
+            score = 0;
+            currentSpeed = INITIAL_SPEED;
+            isGameActive = false;
+            changingDirection = false;
+            
+            clearInterval(gameLoop);
+            
+            scoreDisplay.innerHTML = `<i class="fas fa-apple-alt mr-2"></i> 점수: 0`;
+            statusElement.textContent = `준비, 시작 버튼을 누르세요.`;
+            startButton.textContent = `게임 시작`;
+            startButton.disabled = false;
+
+            renderBoard();
+            placeFood();
+            draw();
+        }
+
+        function renderBoard() {
+            boardElement.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1fr)`;
+            boardElement.style.width = `${GRID_SIZE * 20 + 8}px`; // 셀 크기 20px 기준
+            boardElement.style.height = `${GRID_SIZE * 20 + 8}px`; 
+            boardElement.innerHTML = '';
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // --- 핵심 로직 ---
+
+        // 뱀과 먹이를 화면에 그리는 함수
+        function draw() {
+            // 1. 모든 셀 클래스 초기화
+            const allCells = boardElement.querySelectorAll('.cell');
+            allCells.forEach(cell => {
+                cell.className = 'cell';
+            });
+
+            // 2. 뱀 그리기
+            snake.forEach((segment, index) => {
+                const cell = boardElement.querySelector(`[data-row="${segment.y}"][data-col="${segment.x}"]`);
+                if (cell) {
+                    if (index === 0) {
+                        cell.classList.add('snake-head');
+                    } else {
+                        cell.classList.add('snake-body');
+                    }
+                }
+            });
+
+            // 3. 먹이 그리기
+            const foodCell = boardElement.querySelector(`[data-row="${food.y}"][data-col="${food.x}"]`);
+            if (foodCell) {
+                foodCell.classList.add('food');
+            }
+        }
+
+        // 뱀 이동 로직
+        function advanceSnake() {
+            // 새 머리 위치 계산
+            const newHead = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+            // 충돌 확인 (벽 또는 자기 몸통)
+            if (checkCollision(newHead)) {
+                gameOver();
+                return;
+            }
+
+            // 뱀 머리를 추가하고
+            snake.unshift(newHead);
+
+            // 먹이 섭취 확인
+            if (newHead.x === food.x && newHead.y === food.y) {
+                // 먹이를 먹었으면 꼬리를 자르지 않고, 점수 증가, 새 먹이 배치, 속도 증가
+                score += 10;
+                scoreDisplay.innerHTML = `<i class="fas fa-apple-alt mr-2"></i> 점수: ${score}`;
+                placeFood();
+                
+                // 속도 증가 (최소 속도 50ms)
+                if (currentSpeed > 50) {
+                    currentSpeed -= 5;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(gameTick, currentSpeed);
+                }
+
+            } else {
+                // 먹지 않았으면 꼬리를 자름 (이동 효과)
+                snake.pop();
+            }
+
+            changingDirection = false; // 방향 전환 잠금 해제
+            draw();
+        }
+
+        // 충돌 확인
+        function checkCollision(head) {
+            // 1. 자기 몸통과 충돌
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) return true;
+            }
+
+            // 2. 벽과 충돌
+            const hitLeftWall = head.x < 0;
+            const hitRightWall = head.x >= GRID_SIZE;
+            const hitTopWall = head.y < 0;
+            const hitBottomWall = head.y >= GRID_SIZE;
+
+            return hitLeftWall || hitRightWall || hitTopWall || hitBottomWall;
+        }
+
+        // 먹이 배치
+        function placeFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * GRID_SIZE),
+                    y: Math.floor(Math.random() * GRID_SIZE)
+                };
+            } while (isSnakeSegment(newFood)); // 뱀 몸통 위치에 먹이 배치 방지
+
+            food = newFood;
+        }
+
+        // 특정 좌표가 뱀의 몸통인지 확인
+        function isSnakeSegment(pos) {
+            return snake.some(segment => segment.x === pos.x && segment.y === pos.y);
+        }
+
+        // --- 게임 관리 ---
+
+        function startGame() {
+            if (isGameActive) {
+                initializeGame();
+            }
+            
+            isGameActive = true;
+            statusElement.textContent = "게임 진행 중...";
+            startButton.textContent = "일시 정지 (Space)";
+            
+            gameLoop = setInterval(gameTick, currentSpeed);
+        }
+
+        function gameTick() {
+            if (isGameActive) {
+                advanceSnake();
+            }
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            clearInterval(gameLoop);
+            statusElement.textContent = "게임 오버! 💀";
+            startButton.textContent = "다시 시작";
+            startButton.disabled = false;
+        }
+        
+        // --- 키보드 입력 처리 ---
+        function handleKeyDown(e) {
+            if (e.key === ' ') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+
+            if (!isGameActive || changingDirection) return;
+
+            const keyPressed = e.key;
+
+            const GOING_UP = dy === -1;
+            const GOING_DOWN = dy === 1;
+            const GOING_LEFT = dx === -1;
+            const GOING_RIGHT = dx === 1;
+
+            let newDx = dx;
+            let newDy = dy;
+
+            switch (keyPressed) {
+                case 'ArrowLeft':
+                    if (!GOING_RIGHT) { newDx = -1; newDy = 0; }
+                    break;
+                case 'ArrowUp':
+                    if (!GOING_DOWN) { newDx = 0; newDy = -1; }
+                    break;
+                case 'ArrowRight':
+                    if (!GOING_LEFT) { newDx = 1; newDy = 0; }
+                    break;
+                case 'ArrowDown':
+                    if (!GOING_UP) { newDx = 0; newDy = 1; }
+                    break;
+                default:
+                    return; // 다른 키 무시
+            }
+            
+            // 방향이 실제로 바뀌는 경우에만 적용
+            if (newDx !== dx || newDy !== dy) {
+                changingDirection = true;
+                dx = newDx;
+                dy = newDy;
+                e.preventDefault(); // 스크롤 방지
+            }
+        }
+        
+        function togglePause() {
+            if (isGameActive) {
+                isGameActive = false;
+                clearInterval(gameLoop);
+                statusElement.textContent = "일시 정지 ⏸️";
+                startButton.textContent = "재개";
+            } else if (!isGameOver) {
+                isGameActive = true;
+                statusElement.textContent = "게임 진행 중...";
+                startButton.textContent = "일시 정지 (Space)";
+                gameLoop = setInterval(gameTick, currentSpeed);
+            }
+        }
+
+        // --- 초기화 및 이벤트 연결 ---
+        startButton.addEventListener('click', () => {
+            if (startButton.textContent === '게임 시작' || startButton.textContent === '다시 시작') {
+                startGame();
+            } else {
+                togglePause();
+            }
+        });
+
+        // 페이지 로드 시 초기화
+        initializeGame();
+    </script>
 </body>
 </html>
