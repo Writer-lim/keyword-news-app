@@ -17,9 +17,10 @@
             border: 4px solid #334155;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             margin: 0 auto;
-            /* 10x10 보드의 고정 너비 지정 (30px * 10칸 + 보더 여유분) */
-            width: 308px; /* 너비가 줄어드는 문제 해결 */
+            /* 고정 너비 및 크기 줄어듦 방지 (문제 1 해결) */
+            width: 308px; /* 10 * 30px + 2 * 4px border + 2 * 1px gap 여유분 */
             height: 308px;
+            flex-shrink: 0;
         }
         /* 각 셀 스타일 */
         .cell {
@@ -34,6 +35,7 @@
             cursor: pointer;
             user-select: none;
             transition: background-color 0.1s;
+            font-size: 16px;
         }
         .cell:hover:not(.revealed):not(.flagged) {
             background-color: #e5e7eb; /* Gray-200 on hover */
@@ -46,11 +48,12 @@
         .cell.mine {
             background-color: #ef4444; /* Red-500 */
             color: white;
+            font-size: 18px; /* 폭탄 아이콘 크기 */
         }
         .cell.flagged {
             background-color: #22c55e; /* Green-500 */
             color: white;
-            font-size: 14px; /* 깃발 아이콘 크기 */
+            font-size: 18px; /* 깃발 아이콘 크기 */
         }
         /* 숫자별 색상 */
         .count-1 { color: #2563eb; } /* Blue-600 */
@@ -90,11 +93,12 @@
     </div>
 
     <script>
-        // --- 지뢰 찾기 게임 로직 ---
+        // --- 지뢰 찾기 게임 설정 ---
         const ROWS = 10;
         const COLS = 10;
         const MINES = 10;
 
+        // --- 전역 변수 ---
         let boardData = [];
         let gameActive = false;
         let timerInterval = null;
@@ -102,6 +106,7 @@
         let minesFlagged = 0;
         let cellsRevealed = 0;
 
+        // --- DOM 요소 ---
         const boardElement = document.getElementById('board');
         const statusElement = document.getElementById('status');
         const minesLeftElement = document.getElementById('mines-left');
@@ -164,10 +169,10 @@
             }
         }
         
-        // UI 렌더링 및 이벤트 리스너 설정
+        // UI 렌더링 및 이벤트 리스너 설정 (문제 2 해결: 리셋 시 보드 전체를 새로 그림)
         function renderBoard() {
             boardElement.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
-            boardElement.innerHTML = '';
+            boardElement.innerHTML = ''; // 기존 DOM 요소 제거하여 이벤트 리스너 누적 방지
             
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
@@ -177,17 +182,14 @@
                     cell.dataset.row = r;
                     cell.dataset.col = c;
                     
-                    // 우클릭 방지 및 지뢰찾기 로직 연결 (깃발 토글)
+                    // 이벤트 리스너 설정
                     cell.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         if (gameActive) toggleFlag(r, c);
                     });
-                    // 좌클릭 로직 연결 (셀 열기)
                     cell.addEventListener('click', () => {
-                        // 게임 시작 전 (cellsRevealed === 0)에도 클릭 허용
-                        if (gameActive || cellsRevealed === 0) { 
-                            handleClick(r, c);
-                        }
+                        // 게임 상태와 관계없이 handleClick을 호출하여 첫 클릭 로직을 처리하게 함
+                        handleClick(r, c);
                     });
 
                     updateCellDisplay(cell, cellData);
@@ -231,15 +233,16 @@
                 timerElement.textContent = `시간: ${timeElapsed}`;
             }, 1000);
 
-            // 첫 클릭 처리 (안전한 칸이므로 바로 열기)
+            // 첫 클릭 처리
             revealCell(r, c);
         }
 
         // 클릭 처리 (핵심 로직)
         function handleClick(r, c) {
+            // 게임이 비활성 상태에서 첫 클릭이라면 게임 시작
             if (cellsRevealed === 0) {
-                // 첫 클릭이라면 게임 시작 (지뢰 배치 및 타이머 시작)
                 startGame(r, c);
+                updateBoardDisplay(); // 첫 클릭 후 주변 셀 상태 업데이트
                 return;
             }
 
@@ -250,8 +253,6 @@
                 cellData.isRevealed = true;
                 gameOver(false); // 패배
             } else {
-                // 이 부분이 이전에 클릭 무반응의 원인이었을 수 있습니다.
-                // 첫 클릭이 아닌 이후 클릭은 바로 revealCell을 호출합니다.
                 revealCell(r, c);
                 checkWin();
             }
@@ -259,25 +260,25 @@
             updateBoardDisplay();
         }
 
-        // 셀 열기
+        // 셀 열기 (재귀를 통해 주변 0셀 자동 열기 처리)
         function revealCell(r, c) {
             if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
             
             const cellData = boardData[r][c];
             
-            // 이미 열렸거나, 지뢰이거나, 깃발이 있다면 리턴 (지뢰는 handleClick에서만 처리)
-            if (cellData.isRevealed || cellData.isFlagged || cellData.isMine) return;
+            // 이미 열렸거나, 깃발이 있다면 리턴 (지뢰는 handleClick에서만 터트림)
+            if (cellData.isRevealed || cellData.isFlagged) return;
             
-            // 여기서 cellsRevealed를 증가시키는 것이 중요합니다.
+            // 셀을 열고 카운트 증가
             cellData.isRevealed = true;
-            cellsRevealed++; // <--- 카운트 증가
+            cellsRevealed++;
 
             if (cellData.neighborMines === 0) {
                 // 주변 지뢰가 0개면 주변 8칸도 열기 (재귀 호출)
                 for (let dr = -1; dr <= 1; dr++) {
                     for (let dc = -1; dc <= 1; dc++) {
                         if (dr !== 0 || dc !== 0) {
-                            revealCell(r + dr, c + dc); // 재귀 호출
+                            revealCell(r + dr, c + dc); 
                         }
                     }
                 }
@@ -301,7 +302,6 @@
 
         // 승리 조건 확인
         function checkWin() {
-            // 지뢰가 아닌 모든 셀이 열렸을 때
             const nonMineCells = ROWS * COLS - MINES;
             if (cellsRevealed === nonMineCells) {
                 gameOver(true);
@@ -330,7 +330,7 @@
             updateBoardDisplay();
         }
 
-        // 전체 보드 화면 업데이트
+        // 전체 보드 화면 업데이트 (DOM 요소와 데이터 동기화)
         function updateBoardDisplay() {
             // DOM에서 해당하는 셀 요소를 찾아서 상태 업데이트
             for (let r = 0; r < ROWS; r++) {
@@ -343,19 +343,16 @@
             }
         }
 
-        // 리셋 함수
+        // 게임 리셋
         function resetGame() {
             initializeBoard();
-            renderBoard();
+            renderBoard(); // 보드와 이벤트 리스너를 완전히 새로 만듦
             gameActive = false;
             clearInterval(timerInterval);
             timerInterval = null;
             timeElapsed = 0;
             minesFlagged = 0;
             cellsRevealed = 0;
-            
-            // CSS에서 고정 너비를 주었으므로 이 코드는 제거해도 됩니다.
-            // boardElement.style.width = `${COLS * 30 + 8}px`; 
             
             statusElement.textContent = "게임을 시작하세요! (첫 클릭 시 지뢰 배치)";
             minesLeftElement.innerHTML = `<i class="fas fa-bomb mr-2"></i> 지뢰: ${MINES}`;
