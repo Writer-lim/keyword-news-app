@@ -2,21 +2,293 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>메모리 게임</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="p-8 flex flex-col items-center justify-center min-h-screen bg-gray-50">
-    <div class="bg-white p-8 rounded-xl shadow-2xl text-center">
-        <h1 class="text-3xl font-bold text-gray-800 mb-4">메모리 게임</h1>
-        <p class="text-lg text-red-500 mb-6">아직 게임 코드가 들어가지 않았습니다!</p>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
         
-        <div class="w-64 h-64 bg-gray-200 flex items-center justify-center text-gray-500">
-            [🚧 게임 영역 🚧]
+        /* 카드 컨테이너 */
+        #game-board {
+            display: grid;
+            gap: 12px;
+            /* 4x4 그리드 기본 설정 */
+            grid-template-columns: repeat(4, 1fr);
+            padding: 20px;
+            background-color: #334155; /* Slate-700 */
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 카드 자체 스타일 */
+        .card {
+            width: 80px;
+            height: 100px;
+            perspective: 1000px; /* 3D 효과를 위한 원근감 설정 */
+            cursor: pointer;
+        }
+
+        /* 카드 내부 컨테이너 (회전 대상) */
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        /* 카드가 뒤집혔을 때 회전 */
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        /* 카드 앞면 (숨김) */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* 뒷면이 보이지 않도록 설정 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        /* 카드 뒷면 (색상) */
+        .card-back {
+            background-color: #64748b; /* Slate-500 (덮여 있는 상태) */
+            color: #ffffff;
+            /* 테두리 스타일 */
+            border: 4px solid #94a3b8; 
+        }
+
+        /* 카드 앞면 (아이콘) */
+        .card-front {
+            background-color: #f1f5f9; /* Slate-100 (열린 상태) */
+            color: #334155;
+            transform: rotateY(180deg);
+            border: 4px solid #64748b; 
+        }
+
+        /* 짝 맞춘 카드 */
+        .card.matched {
+            pointer-events: none; /* 클릭 비활성화 */
+            opacity: 0.6;
+        }
+        
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center gap-6 w-full max-w-lg">
+        
+        <h1 class="text-3xl font-bold text-center mb-2 text-gray-800 flex items-center">
+            <i class="fas fa-brain text-purple-600 mr-3"></i> 메모리 게임
+        </h1>
+
+        <div class="text-xl font-semibold mb-4 w-full flex justify-around">
+            <div id="flips-display" class="text-blue-600">
+                <i class="fas fa-sync-alt mr-2"></i> 시도: 0
+            </div>
+            <div id="matches-display" class="text-green-600">
+                <i class="fas fa-check-double mr-2"></i> 짝: 0 / 8
+            </div>
         </div>
 
-        <a href="/" class="block mt-8 text-indigo-500 hover:text-indigo-700 font-medium">
-            ← 메인 검색 페이지로 돌아가기
-        </a>
+        <div id="game-board">
+            </div>
+
+        <div class="w-full text-center mt-4">
+            <p id="game-message" class="text-lg font-bold text-red-500 mb-4 hidden">게임 승리!</p>
+            <button id="start-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-transform transform hover:scale-[1.02] active:scale-95">
+                게임 시작 (4x4)
+            </button>
+        </div>
     </div>
+
+    <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
+        ← 메인 검색 페이지로 돌아가기
+    </a>
+
+    <script>
+        // --- 게임 설정 ---
+        const EMOJIS = ['🚀', '🌟', '💡', '💖', '🔥', '🎉', '🌈', '🍦']; // 8쌍의 아이콘
+        const BOARD_SIZE = 4; // 4x4 보드
+
+        // --- DOM 요소 ---
+        const gameBoard = document.getElementById('game-board');
+        const flipsDisplay = document.getElementById('flips-display');
+        const matchesDisplay = document.getElementById('matches-display');
+        const startButton = document.getElementById('start-button');
+        const gameMessage = document.getElementById('game-message');
+
+        // --- 게임 상태 변수 ---
+        let cards = []; // 카드 배열 (아이콘, ID, 매칭 상태 포함)
+        let flippedCards = []; // 현재 뒤집힌 카드
+        let busy = false; // 카드 비교 중 클릭 방지 플래그
+        let flips = 0;
+        let matches = 0;
+        let totalMatches = EMOJIS.length;
+
+        // --- 초기화 ---
+
+        function initializeGame() {
+            flips = 0;
+            matches = 0;
+            busy = false;
+            flippedCards = [];
+            gameMessage.classList.add('hidden');
+            startButton.textContent = '게임 재시작';
+            
+            flipsDisplay.innerHTML = `<i class="fas fa-sync-alt mr-2"></i> 시도: 0`;
+            matchesDisplay.innerHTML = `<i class="fas fa-check-double mr-2"></i> 짝: 0 / ${totalMatches}`;
+            
+            generateCards();
+            renderBoard();
+        }
+
+        // 카드 쌍 생성 및 무작위 섞기
+        function generateCards() {
+            cards = [];
+            let cardId = 0;
+            
+            // 8개의 이모지 쌍 생성
+            EMOJIS.forEach(emoji => {
+                cards.push({ id: cardId++, value: emoji, matched: false });
+                cards.push({ id: cardId++, value: emoji, matched: false });
+            });
+
+            // Fisher-Yates 셔플 알고리즘으로 카드 섞기
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+        }
+
+        // --- 렌더링 ---
+
+        function renderBoard() {
+            gameBoard.innerHTML = '';
+            gameBoard.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
+            
+            cards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card');
+                cardElement.dataset.id = card.id;
+                cardElement.dataset.value = card.value;
+                
+                // 이미 맞춘 카드라면 'flipped' 및 'matched' 클래스 추가
+                if (card.matched) {
+                    cardElement.classList.add('flipped', 'matched');
+                }
+
+                cardElement.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-face card-back">?</div>
+                        <div class="card-face card-front">${card.value}</div>
+                    </div>
+                `;
+                
+                // 이미 맞춘 카드가 아니라면 클릭 이벤트 리스너 추가
+                if (!card.matched) {
+                    cardElement.addEventListener('click', () => handleCardClick(cardElement, card));
+                }
+
+                gameBoard.appendChild(cardElement);
+            });
+        }
+
+        // --- 게임 로직 ---
+
+        function handleCardClick(element, cardData) {
+            // 게임 중이 아니거나, 이미 뒤집혔거나, 비교 중일 때 클릭 무시
+            if (busy || element.classList.contains('flipped')) {
+                return;
+            }
+
+            // 1. 카드 뒤집기
+            element.classList.add('flipped');
+            flippedCards.push({ element, cardData });
+
+            // 2. 카드 카운트 확인
+            if (flippedCards.length === 2) {
+                busy = true; // 추가 클릭 방지
+                flips++;
+                flipsDisplay.innerHTML = `<i class="fas fa-sync-alt mr-2"></i> 시도: ${flips}`;
+                
+                checkForMatch();
+            }
+        }
+
+        function checkForMatch() {
+            const [card1, card2] = flippedCards;
+
+            if (card1.cardData.value === card2.cardData.value) {
+                // 짝 맞춤 성공!
+                
+                matches++;
+                matchesDisplay.innerHTML = `<i class="fas fa-check-double mr-2"></i> 짝: ${matches} / ${totalMatches}`;
+                
+                // 카드를 'matched' 상태로 고정
+                card1.element.classList.add('matched');
+                card2.element.classList.add('matched');
+                
+                // 클릭 이벤트 리스너 제거 (더 이상 건드릴 필요 없음)
+                card1.element.removeEventListener('click', handleCardClick);
+                card2.element.removeEventListener('click', handleCardClick);
+                
+                flippedCards = []; // 다음 시도를 위해 초기화
+                busy = false;
+
+                // 게임 승리 확인
+                if (matches === totalMatches) {
+                    winGame();
+                }
+
+            } else {
+                // 짝 맞춤 실패
+                
+                // 1초 후 카드를 다시 뒤집음
+                setTimeout(() => {
+                    card1.element.classList.remove('flipped');
+                    card2.element.classList.remove('flipped');
+                    
+                    flippedCards = [];
+                    busy = false;
+                }, 1000);
+            }
+        }
+
+        function winGame() {
+            gameMessage.textContent = '축하합니다! 모든 짝을 맞췄습니다!';
+            gameMessage.classList.remove('hidden');
+            gameMessage.classList.add('text-green-600');
+            startButton.textContent = '다시 플레이';
+            startButton.focus();
+        }
+
+        // --- 이벤트 연결 ---
+        startButton.addEventListener('click', initializeGame);
+
+        // 초기 화면 설정 (첫 로드 시)
+        initializeGame();
+
+    </script>
 </body>
 </html>
