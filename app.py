@@ -1,5 +1,3 @@
-[app.py]
-
 import os
 import requests
 from flask import Flask, render_template, request, jsonify
