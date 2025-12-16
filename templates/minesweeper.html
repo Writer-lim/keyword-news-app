@@ -17,8 +17,8 @@
             border: 4px solid #334155;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
             margin: 0 auto;
-            /* 고정 너비 및 크기 줄어듦 방지 (문제 1 해결) */
-            width: 308px; /* 10 * 30px + 2 * 4px border + 2 * 1px gap 여유분 */
+            /* 고정 너비 및 크기 줄어듦 방지 */
+            width: 308px; /* 10 * 30px + border/gap 여유분 */
             height: 308px;
             flex-shrink: 0;
         }
@@ -169,7 +169,7 @@
             }
         }
         
-        // UI 렌더링 및 이벤트 리스너 설정 (문제 2 해결: 리셋 시 보드 전체를 새로 그림)
+        // UI 렌더링 및 이벤트 리스너 설정
         function renderBoard() {
             boardElement.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
             boardElement.innerHTML = ''; // 기존 DOM 요소 제거하여 이벤트 리스너 누적 방지
@@ -182,13 +182,38 @@
                     cell.dataset.row = r;
                     cell.dataset.col = c;
                     
-                    // 이벤트 리스너 설정
+                    // --- 좌우 동시 클릭 처리를 위한 마우스 상태 추적 변수 ---
+                    let mouseState = 0; // 1: 좌클릭, 2: 우클릭
+
+                    cell.addEventListener('mousedown', (e) => {
+                        if (e.button === 2) { // 우클릭
+                            if (mouseState & 1) { // 이미 좌클릭이 눌려 있었다면 (Chord Click)
+                                e.preventDefault();
+                                chordClick(r, c);
+                            }
+                            mouseState |= 2; // 우클릭 상태 기록
+                        } else if (e.button === 0) { // 좌클릭
+                            mouseState |= 1; // 좌클릭 상태 기록
+                        }
+                    });
+
+                    cell.addEventListener('mouseup', (e) => {
+                        if (e.button === 2) {
+                            mouseState &= ~2; // 우클릭 상태 해제
+                        } else if (e.button === 0) {
+                            mouseState &= ~1; // 좌클릭 상태 해제
+                        }
+                    });
+                    
+                    // 우클릭 (깃발 토글)
                     cell.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         if (gameActive) toggleFlag(r, c);
                     });
+
+                    // 좌클릭 (셀 열기)
                     cell.addEventListener('click', () => {
-                        // 게임 상태와 관계없이 handleClick을 호출하여 첫 클릭 로직을 처리하게 함
+                        // mousedown에서 동시 클릭을 처리했으므로, 여기서는 단순 좌클릭 처리
                         handleClick(r, c);
                     });
 
@@ -267,7 +292,7 @@
             const cellData = boardData[r][c];
             
             // 이미 열렸거나, 깃발이 있다면 리턴 (지뢰는 handleClick에서만 터트림)
-            if (cellData.isRevealed || cellData.isFlagged) return;
+            if (cellData.isRevealed || cellData.isFlagged || cellData.isMine) return;
             
             // 셀을 열고 카운트 증가
             cellData.isRevealed = true;
@@ -299,6 +324,63 @@
             updateBoardDisplay();
             checkWin();
         }
+
+        // --- 새로운 기능: 좌/우 동시 클릭 로직 (Chord Click) ---
+        function chordClick(r, c) {
+            const cellData = boardData[r][c];
+            
+            // 1. 셀이 이미 열려 있어야 하고, 지뢰가 아니어야 하며 게임이 진행 중이어야 함
+            if (!cellData.isRevealed || cellData.isMine || !gameActive) return;
+
+            // 2. 주변 깃발 개수 세기 및 주변 셀 목록 확보
+            let flagCount = 0;
+            const neighborsToReveal = [];
+
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = r + dr;
+                    const nc = c + dc;
+
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                        const neighborCell = boardData[nr][nc];
+                        if (neighborCell.isFlagged) {
+                            flagCount++;
+                        } else if (!neighborCell.isRevealed && !neighborCell.isFlagged) {
+                            // 깃발도 없고, 열리지도 않은 셀만 열기 대상 목록에 추가
+                            neighborsToReveal.push({ r: nr, c: nc, data: neighborCell });
+                        }
+                    }
+                }
+            }
+
+            // 3. 주변 깃발 개수가 셀의 숫자(neighborMines)와 일치할 때만 주변 셀을 열기 시도
+            if (flagCount === cellData.neighborMines) {
+                let boom = false;
+                
+                neighborsToReveal.forEach(neighbor => {
+                    // 안전한 셀이 아니라 지뢰를 열었다면 패배
+                    if (neighbor.data.isMine) {
+                        boardData[neighbor.r][neighbor.c].isRevealed = true; // 지뢰 공개
+                        boom = true;
+                    } else {
+                        // 안전한 셀이라면 열기
+                        revealCell(neighbor.r, neighbor.c);
+                    }
+                });
+
+                // 4. 패배 처리 또는 승리 확인
+                if (boom) {
+                    gameOver(false);
+                } else {
+                    checkWin();
+                }
+
+                updateBoardDisplay();
+            }
+        }
+        // --- 좌/우 동시 클릭 로직 끝 ---
+
 
         // 승리 조건 확인
         function checkWin() {
