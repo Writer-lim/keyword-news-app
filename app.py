@@ -14,10 +14,10 @@ NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "AgwStYnlHOuNUOOn7kiD")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "_ZBcX8Ec50")
 
 # 유튜브 API 키
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGg9h2sPSM") 
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGg9h2sPSM")
 
 # =========================================================================
-# 2. 페이지 라우트 (수정된 부분: 5개 게임 라우트 추가)
+# 2. 페이지 라우트 (수정된 부분: 스도쿠, 2048 라우트 추가)
 # =========================================================================
 
 @app.route('/')
@@ -33,27 +33,39 @@ def tictactoe_game():
 @app.route('/game/minesweeper')
 def minesweeper_game():
     """지뢰 찾기 게임 페이지를 렌더링합니다."""
-    return render_template('minesweeper.html') 
+    return render_template('minesweeper.html')
 
 @app.route('/game/memory')
 def memory_game():
     """메모리 게임 페이지를 렌더링합니다."""
-    return render_template('memory.html') 
+    return render_template('memory.html')
 
 @app.route('/game/snake')
 def snake_game():
     """뱀 게임 페이지를 렌더링합니다."""
-    return render_template('snake.html') 
+    return render_template('snake.html')
 
 @app.route('/game/pong')
 def pong_game():
     """퐁 게임 페이지를 렌더링합니다."""
-    return render_template('pong.html') 
+    return render_template('pong.html')
 
 @app.route('/game/tetris')
 def tetris_game():
     """테트리스 게임 페이지를 렌더링합니다."""
     return render_template('tetris.html')
+
+# --- 새로 추가된 게임 라우트 ---
+@app.route('/game/sudoku')
+def sudoku_game():
+    """스도쿠 게임 페이지를 렌더링합니다."""
+    return render_template('sudoku.html')
+
+@app.route('/game/2048')
+def game_2048():
+    """2048 게임 페이지를 렌더링합니다."""
+    return render_template('2048.html')
+# ------------------------------
 
 # =========================================================================
 # 3. 네이버 뉴스 검색 API 엔드포인트
@@ -66,15 +78,15 @@ def search_news():
 
     enc_text = quote(query)
     url = f"https://openapi.naver.com/v1/search/news.json?query={enc_text}&display=5&sort=sim"
-    
+
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
     }
-    
+
     try:
         response = requests.get(url, headers=headers)
-        response.raise_for_status() 
+        response.raise_for_status()
         return jsonify(response.json())
     except requests.RequestException as e:
         app.logger.error(f"Naver News API request failed: {e}")
@@ -91,12 +103,12 @@ def search_image():
 
     enc_text = quote(query)
     url = f"https://openapi.naver.com/v1/search/image.json?query={enc_text}&display=5&sort=date"
-    
+
     headers = {
         "X-Naver-Client-Id": NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
     }
-    
+
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -118,7 +130,7 @@ def search_youtube():
     params = {
         'part': 'snippet',
         'q': query,
-        'key': YOUTUBE_API_KEY, 
+        'key': YOUTUBE_API_KEY,
         'type': 'video',
         'maxResults': 5,
         'regionCode': 'KR'
@@ -133,4 +145,5 @@ def search_youtube():
         return jsonify({"error": f"YouTube API error: {e}"}), 500
 
 if __name__ == '__main__':
+    # Render 환경에서 포트 충돌을 피하기 위해 host='0.0.0.0'을 사용하는 것이 좋습니다.
     app.run(debug=True, host='0.0.0.0', port=5000)
