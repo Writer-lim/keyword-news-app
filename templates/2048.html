@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f4f8; }
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            width: 440px;
+            height: 440px;
+            background-color: #bbada0;
+            border-radius: 6px;
+            padding: 10px;
+        }
+        .tile-container {
+            position: relative;
+            background-color: rgba(238, 228, 218, 0.35);
+            border-radius: 3px;
+        }
+        .tile {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100px;
+            height: 100px;
+            border-radius: 3px;
+            font-size: 32px;
+            font-weight: 700;
+            color: #776e65;
+            transition: 100ms ease-in-out;
+            transition-property: transform;
+            transform: scale(1);
+            /* 초기 위치는 JS에서 설정 */
+        }
+        .tile-2 { background-color: #eee4da; color: #776e65; }
+        .tile-4 { background-color: #ede0c8; color: #776e65; }
+        .tile-8 { background-color: #f2b179; color: #f9f6f2; font-size: 36px; }
+        .tile-16 { background-color: #f59563; color: #f9f6f2; font-size: 36px; }
+        .tile-32 { background-color: #f67c5f; color: #f9f6f2; font-size: 36px; }
+        .tile-64 { background-color: #f65e3b; color: #f9f6f2; font-size: 36px; }
+        .tile-128 { background-color: #edcf72; color: #f9f6f2; font-size: 30px; }
+        .tile-256 { background-color: #edcc61; color: #f9f6f2; font-size: 30px; }
+        .tile-512 { background-color: #edc850; color: #f9f6f2; font-size: 30px; }
+        .tile-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 24px; }
+        .tile-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 24px; }
+        .tile-higher { background-color: #3c3a32; color: #f9f6f2; font-size: 24px; }
+
+        .tile-new { animation: appear 200ms ease-in; }
+        @keyframes appear { 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4" onkeydown="handleKeyDown(event)">
+
+    <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center gap-6">
+        
+        <div class="flex justify-between items-center w-full max-w-[440px] mb-4">
+            <h1 class="text-4xl font-bold text-gray-800">🔥 2048</h1>
+            <div class="flex space-x-3">
+                <div class="text-center p-2 bg-gray-200 rounded-lg">
+                    <div class="text-xs font-medium text-gray-600">점수</div>
+                    <div id="score" class="text-xl font-extrabold text-gray-800">0</div>
+                </div>
+                <button id="restart-button" onclick="startGame()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 active:scale-95">
+                    새 게임
+                </button>
+            </div>
+        </div>
+
+        <div id="game-message" class="text-center text-2xl font-bold text-red-600 hidden">
+            게임 오버!
+        </div>
+
+        <div id="game-board">
+            </div>
+        
+        <div class="mt-4 text-sm text-gray-700 max-w-[440px] text-center">
+            <h3 class="font-bold mb-1">🎮 조작 키</h3>
+            <p>화살표 키 (↑, ↓, ←, →)를 사용하여 타일을 이동 및 합치세요.</p>
+        </div>
+    </div>
+
+    <a href="/" class="block mt-4 text-center text-indigo-500 hover:text-indigo-700 font-medium">
+        ← 메인 검색 페이지로 돌아가기
+    </a>
+
+    <script>
+        const GRID_SIZE = 4;
+        const boardElement = document.getElementById('game-board');
+        const scoreElement = document.getElementById('score');
+        const messageElement = document.getElementById('game-message');
+        
+        let board;
+        let score = 0;
+        let tileId = 0;
+        
+        // 타일 색상 및 스타일 매핑
+        const tileClasses = {
+            2: 'tile-2', 4: 'tile-4', 8: 'tile-8', 16: 'tile-16', 32: 'tile-32', 
+            64: 'tile-64', 128: 'tile-128', 256: 'tile-256', 512: 'tile-512', 
+            1024: 'tile-1024', 2048: 'tile-2048'
+        };
+
+        // --- 보드 및 타일 관리 ---
+
+        function setupBoard() {
+            board = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+            boardElement.innerHTML = '';
+            
+            // 타일 컨테이너 생성 (4x4 격자)
+            for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                const container = document.createElement('div');
+                container.classList.add('tile-container');
+                boardElement.appendChild(container);
+            }
+        }
+
+        // 새 타일 (2 또는 4)을 빈 위치에 추가
+        function addRandomTile() {
+            const availableCells = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c] === 0) {
+                        availableCells.push({ r, c });
+                    }
+                }
+            }
+            if (availableCells.length > 0) {
+                const { r, c } = availableCells[Math.floor(Math.random() * availableCells.length)];
+                const value = Math.random() < 0.9 ? 2 : 4; // 90% 확률로 2, 10% 확률로 4
+                board[r][c] = value;
+                createTile(r, c, value, true);
+            }
+        }
+        
+        // 타일 DOM 요소를 생성하고 보드에 배치
+        function createTile(r, c, value, isNew = false) {
+            const tile = document.createElement('div');
+            tile.id = `tile-${tileId++}`;
+            tile.textContent = value;
+            tile.classList.add('tile', tileClasses[value] || 'tile-higher');
+            
+            if (isNew) {
+                tile.classList.add('tile-new');
+            }
+            
+            // 타일의 위치를 CSS transform으로 설정
+            tile.style.left = `${c * 110 + 10}px`; // (100px width + 10px gap) * c + 10px padding
+            tile.style.top = `${r * 110 + 10}px`;   // (100px height + 10px gap) * r + 10px padding
+            tile.style.transform = 'translate(0, 0)';
+            
+            boardElement.appendChild(tile);
+            return tile;
+        }
+
+        // 전체 보드를 렌더링
+        function renderBoard() {
+            // 기존 타일 제거 (새로운 위치에서 다시 그림)
+            const tilesToRemove = Array.from(document.querySelectorAll('.tile'));
+            tilesToRemove.forEach(tile => tile.remove());
+            
+            // 새 위치에 타일 다시 생성
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c] !== 0) {
+                        createTile(r, c, board[r][c]);
+                    }
+                }
+            }
+            scoreElement.textContent = score;
+        }
+
+        // --- 게임 로직: 이동 및 합치기 ---
+
+        // 배열을 주어진 방향으로 밀어내고 합치는 코어 함수
+        function operateRow(row) {
+            let moved = false;
+            
+            // 1. 0 제거 (압축)
+            let newRow = row.filter(val => val !== 0);
+            let zeros = Array(GRID_SIZE - newRow.length).fill(0);
+            newRow = newRow.concat(zeros);
+            
+            if (JSON.stringify(row) !== JSON.stringify(newRow)) {
+                moved = true;
+            }
+
+            // 2. 합치기
+            for (let i = 0; i < GRID_SIZE - 1; i++) {
+                if (newRow[i] !== 0 && newRow[i] === newRow[i + 1]) {
+                    newRow[i] *= 2;
+                    score += newRow[i];
+                    newRow[i + 1] = 0;
+                    moved = true;
+                }
+            }
+
+            // 3. 다시 압축
+            newRow = newRow.filter(val => val !== 0);
+            zeros = Array(GRID_SIZE - newRow.length).fill(0);
+            newRow = newRow.concat(zeros);
+
+            return { newRow, moved };
+        }
+
+        // 보드를 시계 방향으로 90도 회전
+        function rotateBoard(board) {
+            const newBoard = createEmptyBoard();
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    newBoard[c][GRID_SIZE - 1 - r] = board[r][c];
+                }
+            }
+            return newBoard;
+        }
+
+        // 이동 처리 함수
+        function move(direction) {
+            let boardChanged = false;
+            let originalBoard = JSON.parse(JSON.stringify(board)); // 원본 보드 저장
+            
+            let tempBoard = JSON.parse(JSON.stringify(board));
+
+            // Up, Down, Left, Right 이동을 위해 보드를 회전 (왼쪽 이동 기준으로 통일)
+            let numRotations = 0;
+            if (direction === 'ArrowUp') numRotations = 3;
+            if (direction === 'ArrowDown') numRotations = 1;
+            if (direction === 'ArrowRight') numRotations = 2;
+            
+            for (let i = 0; i < numRotations; i++) {
+                tempBoard = rotateBoard(tempBoard);
+            }
+
+            // 왼쪽으로 이동 및 합치기
+            for (let r = 0; r < GRID_SIZE; r++) {
+                const { newRow, moved } = operateRow(tempBoard[r]);
+                if (moved) boardChanged = true;
+                tempBoard[r] = newRow;
+            }
+
+            // 원래 방향으로 다시 회전
+            let finalBoard = tempBoard;
+            for (let i = 0; i < (4 - numRotations) % 4; i++) {
+                finalBoard = rotateBoard(finalBoard);
+            }
+
+            if (boardChanged) {
+                board = finalBoard;
+                addRandomTile(); // 새 타일 추가
+                renderBoard();
+                
+                if (isGameOver()) {
+                    messageElement.textContent = "게임 오버! 다시 시작하세요.";
+                    messageElement.classList.remove('hidden');
+                }
+            }
+        }
+        
+        // 빈 보드 생성 (유틸리티 함수)
+        function createEmptyBoard() {
+            return Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+        }
+
+        // 게임 오버 조건 확인 (더 이상 움직일 수 없는지)
+        function isGameOver() {
+            // 빈 공간이 있다면 게임 오버 아님
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c] === 0) return false;
+                }
+            }
+
+            // 합칠 수 있는 타일이 있는지 확인
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const current = board[r][c];
+                    // 가로 체크
+                    if (c < GRID_SIZE - 1 && current === board[r][c + 1]) return false;
+                    // 세로 체크
+                    if (r < GRID_SIZE - 1 && current === board[r + 1][c]) return false;
+                }
+            }
+            return true; // 빈 공간도 없고, 합칠 것도 없음
+        }
+
+        // --- 게임 시작 및 이벤트 핸들러 ---
+        
+        function startGame() {
+            messageElement.classList.add('hidden');
+            score = 0;
+            tileId = 0;
+            setupBoard();
+            addRandomTile();
+            addRandomTile();
+            renderBoard();
+        }
+
+        function handleKeyDown(e) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault(); // 스크롤 방지
+                if (messageElement.classList.contains('hidden')) {
+                    move(e.key);
+                }
+            }
+        }
+
+        // 초기 시작
+        document.addEventListener('DOMContentLoaded', startGame);
+    </script>
+</body>
+</html>
