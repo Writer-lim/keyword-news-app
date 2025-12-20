@@ -230,8 +230,10 @@
             generateRandomTile();
             generateRandomTile(); 
             
-            updateBoardUI();
-            // startGame에서는 checkGameOver()를 호출하지 않습니다.
+            // NOTE: 브라우저가 DOM의 크기를 완전히 계산한 후 UI 업데이트가 실행되도록 지연 (가장 중요한 수정)
+            setTimeout(() => {
+                updateBoardUI();
+            }, 50); 
         }
         
         // --- 3. 게임 로직 (타일 이동 및 합치기) ---
@@ -294,7 +296,7 @@
             if (moved) {
                 generateRandomTile();
                 updateBoardUI();
-                checkGameOver(); // 이동 후에만 게임 오버 체크
+                checkGameOver();
             }
             
             return moved;
@@ -351,7 +353,10 @@
         document.getElementById('new-game-btn').addEventListener('click', startGame);
 
         // --- 초기 시작 ---
-        document.addEventListener('DOMContentLoaded', startGame);
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM 로드 후 100ms 지연 후 startGame 호출 (안정성 확보를 위한 이중 지연)
+            setTimeout(startGame, 100); 
+        });
         
         // --- 터치 이벤트 (모바일 지원) ---
         let startX, startY;
