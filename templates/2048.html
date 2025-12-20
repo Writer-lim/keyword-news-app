@@ -14,23 +14,26 @@
             background-color: #e2e8f0;
         }
         
+        /* 2048 보드 스타일 */
         #game-board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(4, 1fr);
             gap: 12px;
-            background-color: #bfae9e;
+            background-color: #bfae9e; /* Board background color */
             padding: 12px;
             border-radius: 8px;
-            touch-action: none;
+            touch-action: none; 
         }
 
+        /* 빈 셀 스타일 (뒤에 깔리는 배경) */
         .grid-cell {
             aspect-ratio: 1 / 1;
             background-color: #ccc0b4;
             border-radius: 4px;
         }
 
+        /* 타일 기본 스타일 */
         .tile {
             position: absolute;
             display: flex;
@@ -62,13 +65,14 @@
             font-size: 24px;
         }
 
+        /* 게임 오버 오버레이 */
         #game-over-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(238, 228, 218, 0.85);
+            background: rgba(238, 228, 218, 0.85); 
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -165,14 +169,10 @@
         // --- 1. 보드 상태 렌더링 ---
         
         function updateBoardUI() {
-            // console.log('DEBUG: updateBoardUI 시작');
             document.querySelectorAll('.tile').forEach(tile => tile.remove());
             
             const cellElements = gameBoardElement.querySelectorAll('.grid-cell');
-            if (cellElements.length === 0) {
-                 // console.error('ERROR: Grid cells not found. Cannot calculate tile size.');
-                 return;
-            }
+            if (cellElements.length === 0) return;
 
             const cellRect = cellElements[0].getBoundingClientRect();
             const realCellSize = cellRect.width; 
@@ -198,7 +198,6 @@
                 }
             }
             scoreElement.textContent = score;
-            // console.log('DEBUG: updateBoardUI 완료');
         }
         
         // --- 2. 초기화 및 타일 생성 ---
@@ -222,20 +221,17 @@
         }
 
         function startGame() {
-            // console.log('DEBUG: startGame() 호출됨.');
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             score = 0;
             isGameOver = false;
             gameOverOverlay.classList.add('hidden');
             
-            // 타일 생성 (최소 2개)
-            const tile1 = generateRandomTile();
-            const tile2 = generateRandomTile(); 
-            
-            // console.log('DEBUG: 타일 생성 결과:', '1번 성공:', tile1, '2번 성공:', tile2);
-            // console.log('DEBUG: 초기 보드 상태 (0: 빈칸):', board.flat());
+            // 초기 타일 2개 생성
+            generateRandomTile();
+            generateRandomTile(); 
             
             updateBoardUI();
+            // startGame에서는 checkGameOver()를 호출하지 않습니다.
         }
         
         // --- 3. 게임 로직 (타일 이동 및 합치기) ---
@@ -298,7 +294,7 @@
             if (moved) {
                 generateRandomTile();
                 updateBoardUI();
-                checkGameOver();
+                checkGameOver(); // 이동 후에만 게임 오버 체크
             }
             
             return moved;
@@ -307,14 +303,10 @@
         // --- 4. 게임 종료 조건 ---
         
         function hasMoves() {
-            // console.log('DEBUG: hasMoves() 호출됨.');
             // 1. 빈 셀이 있는지 확인
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === 0) {
-                         // console.log('DEBUG: 빈 셀 발견, hasMoves: true');
-                         return true; 
-                    }
+                    if (board[r][c] === 0) return true; 
                 }
             }
 
@@ -323,35 +315,26 @@
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     const val = board[r][c];
                     // 가로 체크
-                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) {
-                        // console.log('DEBUG: 가로 합치기 가능, hasMoves: true');
-                        return true; 
-                    }
+                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) return true; 
                     // 세로 체크
-                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) {
-                        // console.log('DEBUG: 세로 합치기 가능, hasMoves: true');
-                        return true; 
-                    }
+                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) return true; 
                 }
             }
-            // console.log('DEBUG: 움직일 공간 없음, hasMoves: false');
             return false;
         }
 
         function checkGameOver() {
-            // console.log('DEBUG: checkGameOver() 호출됨.');
             if (!hasMoves()) {
                 isGameOver = true;
                 document.getElementById('final-score').textContent = score;
                 gameOverOverlay.classList.remove('hidden');
-                // console.log('DEBUG: 게임 오버! 오버레이 활성화.');
             }
         }
 
         // --- 5. 이벤트 리스너 ---
         document.addEventListener('keydown', (e) => {
             if (isGameOver) return;
-            // ... (키보드 이벤트 로직)
+            
             let direction = -1;
             switch (e.key) {
                 case 'ArrowLeft': direction = 0; break;
