@@ -73,7 +73,7 @@
             width: 100%;
             height: 100%;
             background: rgba(238, 228, 218, 0.85); 
-            display: flex;
+            display: flex; /* Tailwind CSS hidden 클래스 대신 기본값으로 flex를 설정 */
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -225,6 +225,9 @@
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             score = 0;
             isGameOver = false;
+            
+            // UI 문제 해결을 위해 오버레이를 강제로 숨김 (CSS style 직접 적용)
+            gameOverOverlay.style.display = 'none'; 
             gameOverOverlay.classList.add('hidden');
             
             // 초기 타일 2개 생성
@@ -234,20 +237,13 @@
             // 디버깅: 초기 타일 생성 후 보드 상태 확인
             console.log("DEBUG: 초기 보드 상태:", board.flat());
             
-            // NOTE: 브라우저가 DOM의 크기를 완전히 계산한 후 UI 업데이트가 실행되도록 지연 (가장 중요한 수정)
+            // NOTE: 브라우저가 DOM의 크기를 완전히 계산한 후 UI 업데이트가 실행되도록 지연
             setTimeout(() => {
                 updateBoardUI();
                 
                 // 디버깅: startGame() 종료 직전 hasMoves 확인
                 const movesAvailable = hasMoves();
                 console.log(`DEBUG: [setTimeout 내부] hasMoves() 결과: ${movesAvailable}`);
-                
-                // 만약 hasMoves()가 false라면 즉시 게임 오버가 되어야 하는데,
-                // 초기 상태에서는 반드시 true여야 합니다. 
-                if (!movesAvailable && board.flat().filter(v => v !== 0).length < 16) {
-                    // 심각한 논리 오류: 타일이 남아있는데 움직일 공간이 없다고 판단됨
-                    console.error("CRITICAL ERROR: 타일이 있는데 hasMoves()가 False를 반환했습니다.");
-                }
             }, 50); 
         }
         
@@ -317,14 +313,14 @@
             return moved;
         }
 
-        // --- 4. 게임 종료 조건 (hasMoves 로직 강화) ---
+        // --- 4. 게임 종료 조건 ---
         
         function hasMoves() {
-            // 1. 빈 셀이 있는지 확인 (강화: 가장 확실한 방법으로 빈 칸 확인)
+            // 1. 빈 셀이 있는지 확인
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     if (board[r][c] === 0) {
-                        return true; // 빈 칸 있으면 무조건 움직임 가능
+                        return true; 
                     }
                 }
             }
@@ -351,7 +347,11 @@
             if (!hasMoves()) {
                 isGameOver = true;
                 document.getElementById('final-score').textContent = score;
+                
+                // 오버레이를 표시할 때 hidden 클래스를 제거하고 display를 flex로 설정하여 강제로 보이게 함
                 gameOverOverlay.classList.remove('hidden');
+                gameOverOverlay.style.display = 'flex'; // <----- **수정된 코드**
+
                 console.log("DEBUG: 게임 오버 조건 충족! 오버레이 표시.");
             }
         }
