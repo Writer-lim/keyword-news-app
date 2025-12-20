@@ -11,29 +11,26 @@
         
         body {
             font-family: 'Noto Sans KR', sans-serif;
-            background-color: #e2e8f0; /* Blue Gray 200 */
+            background-color: #e2e8f0;
         }
         
-        /* 2048 보드 스타일 */
         #game-board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(4, 1fr);
             gap: 12px;
-            background-color: #bfae9e; /* Board background color */
+            background-color: #bfae9e;
             padding: 12px;
             border-radius: 8px;
-            touch-action: none; /* 모바일에서 스와이프를 막기 위함 */
+            touch-action: none;
         }
 
-        /* 빈 셀 스타일 (뒤에 깔리는 배경) */
         .grid-cell {
             aspect-ratio: 1 / 1;
             background-color: #ccc0b4;
             border-radius: 4px;
         }
 
-        /* 타일 기본 스타일 (JavaScript로 동적으로 생성/배치됨) */
         .tile {
             position: absolute;
             display: flex;
@@ -43,17 +40,13 @@
             font-weight: 900;
             color: #776e65;
             border-radius: 4px;
-            transition: transform 0.1s ease-in-out, background-color 0.2s, color 0.2s, left 0.2s, top 0.2s; /* 움직임 애니메이션 추가 */
+            transition: transform 0.1s ease-in-out, background-color 0.2s, color 0.2s, left 0.2s, top 0.2s;
             z-index: 10;
         }
 
         /* --- 타일 값에 따른 색상 및 폰트 스타일 --- */
-        /* 숫자 폰트 크기는 셀 크기에 따라 유동적으로 조정됩니다. */
-        
-        /* 밝은 배경 타일 */
         .tile-2 { background-color: #eee4da; color: #776e65; font-size: 42px; }
         .tile-4 { background-color: #ede0c8; color: #776e65; font-size: 42px; }
-        /* 어두운 배경 타일 */
         .tile-8 { background-color: #f2b179; color: #f9f6f2; font-size: 42px; }
         .tile-16 { background-color: #f59563; color: #f9f6f2; font-size: 38px; }
         .tile-32 { background-color: #f67c5f; color: #f9f6f2; font-size: 38px; }
@@ -63,22 +56,19 @@
         .tile-512 { background-color: #edc850; color: #f9f6f2; font-size: 32px; }
         .tile-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 28px; }
         .tile-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 28px; }
-
-        /* 더 큰 값 */
         .tile-4096, .tile-8192, .tile-16384 {
             background-color: #3c3a32;
             color: #f9f6f2;
             font-size: 24px;
         }
 
-        /* 게임 오버 오버레이 */
         #game-over-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(238, 228, 218, 0.85); /* 불투명도 조정 */
+            background: rgba(238, 228, 218, 0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -175,29 +165,18 @@
         // --- 1. 보드 상태 렌더링 ---
         
         function updateBoardUI() {
-            // 기존 타일 제거
+            // console.log('DEBUG: updateBoardUI 시작');
             document.querySelectorAll('.tile').forEach(tile => tile.remove());
             
-            // 타일 위치 및 크기 계산 (보드 크기에 맞춰)
-            // 주의: .grid-cell은 JS가 실행될 때 이미 DOM에 존재해야 합니다.
-            const gridRect = gameBoardElement.getBoundingClientRect();
-            // 4x4 그리드의 셀 크기와 갭을 이용해 계산합니다. (12px 갭)
-            const totalGap = 12 * 5; // 4셀 * 12px + 외곽 패딩 12px * 2? 
-            // 실제 CSS 그리드 갭을 계산하기 위해 .grid-cell 크기를 이용하는 것이 가장 정확하지만,
-            // 여기서는 고정된 값 (12px gap)을 이용해 타일 크기를 역산합니다.
-            const cellSize = (gridRect.width - (12 * 5)) / 4; 
-            
-            // 만약 gridRect.width가 0이라면 (요소가 숨겨져 있을 경우) 임시 값을 사용
-            if (gridRect.width === 0) {
-                 // 이 코드가 서버 배포 환경에서 작동할 경우, 클라이언트 브라우저에서 크기를 가져와야 합니다.
-                 // 여기서는 간단히 기본 크기를 가정합니다.
-                 // 정확한 값을 위해선 `gameBoardElement.clientWidth` 사용이 권장됩니다.
-            }
-            
             const cellElements = gameBoardElement.querySelectorAll('.grid-cell');
-            const cellRect = cellElements.length > 0 ? cellElements[0].getBoundingClientRect() : { width: 100 }; // 안전한 기본값
+            if (cellElements.length === 0) {
+                 // console.error('ERROR: Grid cells not found. Cannot calculate tile size.');
+                 return;
+            }
+
+            const cellRect = cellElements[0].getBoundingClientRect();
             const realCellSize = cellRect.width; 
-            const realGapSize = 12; // CSS 값 고정
+            const realGapSize = 12;
 
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
@@ -209,7 +188,6 @@
                         tile.classList.add('tile', tileClass);
                         tile.textContent = value;
                         
-                        // 타일 크기 및 위치 설정
                         tile.style.width = `${realCellSize}px`;
                         tile.style.height = `${realCellSize}px`;
                         tile.style.left = `${c * (realCellSize + realGapSize) + realGapSize}px`;
@@ -220,6 +198,7 @@
                 }
             }
             scoreElement.textContent = score;
+            // console.log('DEBUG: updateBoardUI 완료');
         }
         
         // --- 2. 초기화 및 타일 생성 ---
@@ -236,27 +215,27 @@
             
             if (emptyCells.length > 0) {
                 const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-                // 90% 확률로 2, 10% 확률로 4 생성
                 board[r][c] = (Math.random() < 0.9) ? 2 : 4;
-                return true; // 타일 생성 성공
+                return true;
             }
-            return false; // 빈 셀 없음
+            return false;
         }
 
         function startGame() {
+            // console.log('DEBUG: startGame() 호출됨.');
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             score = 0;
             isGameOver = false;
             gameOverOverlay.classList.add('hidden');
             
-            // 최소 2개의 타일 생성 확인
-            generateRandomTile();
-            generateRandomTile(); 
+            // 타일 생성 (최소 2개)
+            const tile1 = generateRandomTile();
+            const tile2 = generateRandomTile(); 
+            
+            // console.log('DEBUG: 타일 생성 결과:', '1번 성공:', tile1, '2번 성공:', tile2);
+            // console.log('DEBUG: 초기 보드 상태 (0: 빈칸):', board.flat());
             
             updateBoardUI();
-            
-            // 게임 시작 시에는 게임 오버 검사를 하지 않습니다!
-            // checkGameOver(); // <<< 이 호출을 제거했습니다.
         }
         
         // --- 3. 게임 로직 (타일 이동 및 합치기) ---
@@ -272,7 +251,7 @@
                 if (row[i] !== 0 && row[i] === row[i + 1]) {
                     row[i] *= 2;
                     score += row[i];
-                    row[i + 1] = 0; // 합쳐진 다음 타일은 0으로
+                    row[i + 1] = 0;
                 }
             }
             return compress(row); 
@@ -317,7 +296,7 @@
             let moved = (JSON.stringify(originalBoard) !== JSON.stringify(board));
 
             if (moved) {
-                generateRandomTile(); // 이동이 발생해야 새 타일 생성
+                generateRandomTile();
                 updateBoardUI();
                 checkGameOver();
             }
@@ -325,13 +304,17 @@
             return moved;
         }
 
-        // --- 4. 게임 종료 조건 (수정 없음, 빈 셀 확인이 확실함) ---
+        // --- 4. 게임 종료 조건 ---
         
         function hasMoves() {
+            // console.log('DEBUG: hasMoves() 호출됨.');
             // 1. 빈 셀이 있는지 확인
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === 0) return true; 
+                    if (board[r][c] === 0) {
+                         // console.log('DEBUG: 빈 셀 발견, hasMoves: true');
+                         return true; 
+                    }
                 }
             }
 
@@ -340,44 +323,42 @@
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     const val = board[r][c];
                     // 가로 체크
-                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) return true; 
+                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) {
+                        // console.log('DEBUG: 가로 합치기 가능, hasMoves: true');
+                        return true; 
+                    }
                     // 세로 체크
-                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) return true; 
+                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) {
+                        // console.log('DEBUG: 세로 합치기 가능, hasMoves: true');
+                        return true; 
+                    }
                 }
             }
+            // console.log('DEBUG: 움직일 공간 없음, hasMoves: false');
             return false;
         }
 
         function checkGameOver() {
+            // console.log('DEBUG: checkGameOver() 호출됨.');
             if (!hasMoves()) {
                 isGameOver = true;
                 document.getElementById('final-score').textContent = score;
                 gameOverOverlay.classList.remove('hidden');
+                // console.log('DEBUG: 게임 오버! 오버레이 활성화.');
             }
         }
 
         // --- 5. 이벤트 리스너 ---
-        
         document.addEventListener('keydown', (e) => {
             if (isGameOver) return;
-            
+            // ... (키보드 이벤트 로직)
             let direction = -1;
-            
             switch (e.key) {
-                case 'ArrowLeft':
-                    direction = 0;
-                    break;
-                case 'ArrowUp':
-                    direction = 1;
-                    break;
-                case 'ArrowRight':
-                    direction = 2;
-                    break;
-                case 'ArrowDown':
-                    direction = 3;
-                    break;
+                case 'ArrowLeft': direction = 0; break;
+                case 'ArrowUp': direction = 1; break;
+                case 'ArrowRight': direction = 2; break;
+                case 'ArrowDown': direction = 3; break;
             }
-
             if (direction !== -1) {
                 e.preventDefault();
                 move(direction);
@@ -394,7 +375,6 @@
         
         boardContainer.addEventListener('touchstart', (e) => {
             if (isGameOver) return;
-            // e.preventDefault(); // passive: false로 설정했으므로 제거
             const touch = e.touches[0];
             startX = touch.clientX;
             startY = touch.clientY;
@@ -414,10 +394,10 @@
             
             if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
                 move(dx > 0 ? 2 : 0);
-                e.preventDefault(); // 스와이프 후 기본 동작 방지
+                e.preventDefault();
             } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > threshold) {
                 move(dy > 0 ? 3 : 1);
-                e.preventDefault(); // 스와이프 후 기본 동작 방지
+                e.preventDefault();
             }
         }, { passive: false });
 
