@@ -221,6 +221,7 @@
         }
 
         function startGame() {
+            console.log("DEBUG: startGame 호출됨. 초기화 시작.");
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             score = 0;
             isGameOver = false;
@@ -230,9 +231,23 @@
             generateRandomTile();
             generateRandomTile(); 
             
+            // 디버깅: 초기 타일 생성 후 보드 상태 확인
+            console.log("DEBUG: 초기 보드 상태:", board.flat());
+            
             // NOTE: 브라우저가 DOM의 크기를 완전히 계산한 후 UI 업데이트가 실행되도록 지연 (가장 중요한 수정)
             setTimeout(() => {
                 updateBoardUI();
+                
+                // 디버깅: startGame() 종료 직전 hasMoves 확인
+                const movesAvailable = hasMoves();
+                console.log(`DEBUG: [setTimeout 내부] hasMoves() 결과: ${movesAvailable}`);
+                
+                // 만약 hasMoves()가 false라면 즉시 게임 오버가 되어야 하는데,
+                // 초기 상태에서는 반드시 true여야 합니다. 
+                if (!movesAvailable && board.flat().filter(v => v !== 0).length < 16) {
+                    // 심각한 논리 오류: 타일이 남아있는데 움직일 공간이 없다고 판단됨
+                    console.error("CRITICAL ERROR: 타일이 있는데 hasMoves()가 False를 반환했습니다.");
+                }
             }, 50); 
         }
         
@@ -302,34 +317,42 @@
             return moved;
         }
 
-        // --- 4. 게임 종료 조건 ---
+        // --- 4. 게임 종료 조건 (hasMoves 로직 강화) ---
         
         function hasMoves() {
-            // 1. 빈 셀이 있는지 확인
+            // 1. 빈 셀이 있는지 확인 (강화: 가장 확실한 방법으로 빈 칸 확인)
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === 0) return true; 
+                    if (board[r][c] === 0) {
+                        return true; // 빈 칸 있으면 무조건 움직임 가능
+                    }
                 }
             }
-
+            
             // 2. 인접한 타일이 합쳐질 수 있는지 확인
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     const val = board[r][c];
                     // 가로 체크
-                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) return true; 
+                    if (c < BOARD_SIZE - 1 && val === board[r][c + 1]) {
+                        return true;
+                    }
                     // 세로 체크
-                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) return true; 
+                    if (r < BOARD_SIZE - 1 && val === board[r + 1][c]) {
+                        return true; 
+                    }
                 }
             }
             return false;
         }
 
         function checkGameOver() {
+            console.log("DEBUG: checkGameOver() 호출됨. hasMoves 확인 중...");
             if (!hasMoves()) {
                 isGameOver = true;
                 document.getElementById('final-score').textContent = score;
                 gameOverOverlay.classList.remove('hidden');
+                console.log("DEBUG: 게임 오버 조건 충족! 오버레이 표시.");
             }
         }
 
@@ -354,7 +377,7 @@
 
         // --- 초기 시작 ---
         document.addEventListener('DOMContentLoaded', () => {
-            // DOM 로드 후 100ms 지연 후 startGame 호출 (안정성 확보를 위한 이중 지연)
+            // DOM 로드 후 100ms 지연 후 startGame 호출 (안정성 확보)
             setTimeout(startGame, 100); 
         });
         
