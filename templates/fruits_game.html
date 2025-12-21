@@ -16,18 +16,23 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            margin: 0;
         }
 
         #game-container {
             position: relative;
             width: 400px; /* 게임 보드의 너비 */
+            height: 650px; /* 게임 보드 높이 + 상단 점수판 공간 */
             background-color: #ffffff;
             border: 4px solid #10b981; /* 에메랄드 500 */
             border-radius: 12px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Matter.js 캔버스나 과일이 넘치지 않도록 */
         }
 
         #score-board {
+            position: relative;
+            z-index: 200; /* 캔버스 위에 표시 */
             padding: 15px;
             background-color: #059669; /* 에메랄드 600 */
             color: white;
@@ -40,10 +45,21 @@
             font-weight: bold;
         }
 
-        /* Matter.js 캔버스는 여기에 렌더링됩니다 */
+        /* Matter.js 캔버스를 컨테이너에 맞게 위치시킴 */
         #game-canvas {
+            position: absolute;
+            top: 50px; /* 점수판 높이만큼 아래로 내림 */
+            left: 0;
+            width: 400px;
+            height: 600px;
+        }
+        
+        /* Matter.js가 생성하는 캔버스 자체에 대한 스타일 (정확한 위치 지정) */
+        #game-canvas canvas {
             display: block;
-            margin: 0 auto;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         /* 과일 스타일링 */
@@ -56,7 +72,9 @@
             font-weight: 900;
             color: #fff;
             user-select: none;
-            /* Matter.js가 위치와 크기를 관리하지만, 초기 스타일 정의 */
+            /* Matter.js가 변환한 위치에 맞추기 위해 transform 사용 */
+            transform: translate(-50%, -50%); 
+            transition: transform 0.05s linear; /* 부드러운 움직임을 위해 추가 */
         }
 
         /* 게임 오버 오버레이 */
@@ -67,13 +85,13 @@
             width: 100%;
             height: 100%;
             background: rgba(255, 255, 255, 0.9);
-            display: none; /* 초기에는 숨김 */
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
             border-radius: 8px;
-            z-index: 100;
+            z-index: 300;
         }
     </style>
 </head>
@@ -100,8 +118,9 @@
 
     <script>
         // --- Matter.js 초기화 ---
-        const { Engine, Render, World, Bodies, Events } = Matter;
+        const { Engine, Render, World, Bodies, Events, Body, Runner } = Matter; // Runner 추가
 
+        const CANVAS_OFFSET_Y = 50; // 점수판 높이만큼 캔버스 Y 위치 오프셋
         const GAME_WIDTH = 400;
         const GAME_HEIGHT = 600;
         const WALL_THICKNESS = 20;
@@ -110,9 +129,11 @@
         let engine;
         let world;
         let render;
+        let runner; // 러너 객체 추가
         let score = 0;
         let currentFruit = null;
         let fruits = []; // 현재 게임에 있는 모든 과일 객체
+        let isDropping = false; // 과일이 떨어지는 중인지 확인
 
         // 과일 크기와 색상 정의 (1~11단계)
         const FRUITS_DATA = [
@@ -136,36 +157,41 @@
             world = engine.world;
             world.gravity.y = 1; // 기본 중력 설정
 
+            const canvasContainer = document.getElementById(CONTAINER_ID);
+
             render = Render.create({
-                element: document.getElementById(CONTAINER_ID),
+                element: canvasContainer,
                 engine: engine,
                 options: {
                     width: GAME_WIDTH,
                     height: GAME_HEIGHT,
                     wireframes: false, // 와이어프레임 대신 실제 렌더링 사용
-                    background: '#e0f2f1' // 민트 배경
+                    background: '#e0f2f1', // 민트 배경
+                    showInternalEdges: false,
+                    showVelocity: false,
+                    showCollisions: false
                 }
             });
 
             Render.run(render);
-            Engine.run(engine);
+            runner = Runner.run(Engine.create()); // 러너를 사용하여 엔진 루프 실행
         }
 
         function createBoundaries() {
-            // 바닥 (Floor)
+            // 바닥 (Floor): Y축이 캔버스 높이(600)의 중앙에 오도록 + WALL_THICKNESS / 2 만큼 더 내려야 함
             const floor = Bodies.rectangle(GAME_WIDTH / 2, GAME_HEIGHT + WALL_THICKNESS / 2, GAME_WIDTH, WALL_THICKNESS, { 
                 isStatic: true, 
                 label: 'floor',
                 render: { fillStyle: '#4b5563' }
             });
             // 왼쪽 벽 (Left Wall)
-            const leftWall = Bodies.rectangle(-WALL_THICKNESS / 2, GAME_HEIGHT / 2, WALL_THICKNESS, GAME_HEIGHT, { 
+            const leftWall = Bodies.rectangle(-WALL_THICKNESS / 2, GAME_HEIGHT / 2, WALL_THICKNESS, GAME_HEIGHT + 2 * WALL_THICKNESS, { // 약간 더 길게
                 isStatic: true, 
                 label: 'wall',
                 render: { fillStyle: '#4b5563' }
             });
             // 오른쪽 벽 (Right Wall)
-            const rightWall = Bodies.rectangle(GAME_WIDTH + WALL_THICKNESS / 2, GAME_HEIGHT / 2, WALL_THICKNESS, GAME_HEIGHT, { 
+            const rightWall = Bodies.rectangle(GAME_WIDTH + WALL_THICKNESS / 2, GAME_HEIGHT / 2, WALL_THICKNESS, GAME_HEIGHT + 2 * WALL_THICKNESS, { // 약간 더 길게
                 isStatic: true, 
                 label: 'wall',
                 render: { fillStyle: '#4b5563' }
@@ -176,18 +202,22 @@
 
         function startGame() {
             if (engine) {
+                // 기존 엔진 중지 및 정리
+                Runner.stop(runner);
                 World.clear(world, false);
                 Engine.clear(engine);
                 Render.stop(render);
-                // 기존 캔버스 정리
-                const canvasElement = document.querySelector(`#${CONTAINER_ID} canvas`);
-                if (canvasElement) canvasElement.remove();
+                
+                // 기존 캔버스 및 모든 과일 div 요소 정리
+                const canvasContainer = document.getElementById(CONTAINER_ID);
+                canvasContainer.innerHTML = '';
             }
 
             setupEngine();
             createBoundaries();
             fruits = [];
             score = 0;
+            isDropping = false;
             document.getElementById('score').textContent = score;
             document.getElementById('game-over-overlay').style.display = 'none';
 
@@ -203,36 +233,38 @@
         }
 
         function spawnNextFruit() {
-            if (currentFruit) return;
+            if (currentFruit || isDropping) return;
 
             const fruitIndex = getRandomFruitIndex();
             const fruitData = FRUITS_DATA[fruitIndex];
             const radius = fruitData.radius;
             
             // 과일 생성 위치 (보드 중앙 상단)
+            // Y 위치를 캔버스 상단 (0)에 가깝게 설정
             const x = GAME_WIDTH / 2;
-            const y = radius;
+            const y = radius; 
 
             const newFruit = Bodies.circle(x, y, radius, {
                 label: `fruit-${fruitIndex}`,
                 restitution: 0.1, // 반발 계수 (약간 튕김)
                 friction: 0.1,    // 마찰 계수 (약간 굴러다님)
                 density: 0.001,   // 밀도
-                isSleeping: true, // 초기에는 정지 상태
+                isSleeping: true, // 초기에는 정지 상태 (마우스를 따라다님)
+                isSensor: true,   // 떨어뜨리기 전까지는 충돌 감지 안함 (커서를 따라다니기 위함)
                 render: {
-                    fillStyle: fruitData.color
+                    fillStyle: fruitData.color,
+                    visible: false // Matter.js 기본 렌더링은 숨김
                 },
                 fruitIndex: fruitIndex // 사용자 정의 속성 추가
             });
             
-            // 과일 렌더링을 위한 HTML 요소 생성 및 매핑 (Matter.js 렌더링 위에 겹치기)
+            // 과일 렌더링을 위한 HTML 요소 생성 (Matter.js 렌더링 위에 겹치기)
             const fruitDiv = document.createElement('div');
             fruitDiv.classList.add('fruit');
             fruitDiv.innerHTML = fruitData.emoji;
             fruitDiv.style.width = fruitDiv.style.height = `${radius * 2}px`;
             fruitDiv.style.fontSize = `${radius * 0.8}px`;
             fruitDiv.style.backgroundColor = fruitData.color;
-            fruitDiv.style.zIndex = 50;
             
             newFruit.div = fruitDiv; // Matter 바디와 div를 연결
             document.getElementById(CONTAINER_ID).appendChild(fruitDiv);
@@ -243,51 +275,61 @@
 
         // Matter.js 렌더링 업데이트 시 HTML 요소 위치 동기화
         Events.on(engine, 'beforeUpdate', () => {
+            // 떨어진 과일들 위치 업데이트
             fruits.forEach(fruit => {
                 if (fruit.div) {
-                    // Matter 좌표를 HTML 위치로 변환
-                    fruit.div.style.left = `${fruit.position.x - fruit.circleRadius}px`;
-                    fruit.div.style.top = `${fruit.position.y - fruit.circleRadius}px`;
+                    // Matter 좌표 (x, y)를 CSS left/top으로 변환
+                    // transform: translate(-50%, -50%)를 사용하므로, 바디의 중심 위치를 그대로 사용
+                    fruit.div.style.left = `${fruit.position.x}px`;
+                    fruit.div.style.top = `${fruit.position.y}px`;
                 }
             });
             
-            // 현재 떨어뜨릴 과일은 마우스 위치를 따라다니도록 처리
+            // 현재 떨어뜨릴 과일 위치 업데이트 (마우스를 따라다님)
             if (currentFruit && currentFruit.isSleeping) {
                  if (currentFruit.div) {
-                    currentFruit.div.style.left = `${currentFruit.position.x - currentFruit.circleRadius}px`;
-                    currentFruit.div.style.top = `${currentFruit.position.y - currentFruit.circleRadius}px`;
+                    currentFruit.div.style.left = `${currentFruit.position.x}px`;
+                    currentFruit.div.style.top = `${currentFruit.position.y}px`;
                 }
             }
         });
 
         // --- 3. 사용자 입력 처리 (떨어뜨리기) ---
         
+        const gameCanvas = document.getElementById(CONTAINER_ID);
+
         // 마우스 이동 시 현재 과일의 x 위치 업데이트
-        document.getElementById(CONTAINER_ID).addEventListener('mousemove', (e) => {
-            if (currentFruit && currentFruit.isSleeping) {
+        gameCanvas.addEventListener('mousemove', (e) => {
+            if (currentFruit && currentFruit.isSleeping && !isDropping) {
                 const rect = e.currentTarget.getBoundingClientRect();
-                let x = e.clientX - rect.left;
+                // 캔버스 내에서의 상대적인 X 위치
+                let x = e.clientX - rect.left; 
                 
-                // 경계 내 제한
+                // 경계 내 제한: 벽 두께와 과일 반지름을 고려
                 const minX = currentFruit.circleRadius + WALL_THICKNESS;
                 const maxX = GAME_WIDTH - currentFruit.circleRadius - WALL_THICKNESS;
                 
                 x = Math.max(minX, Math.min(maxX, x));
                 
-                // Matter 바디의 위치만 업데이트
-                Matter.Body.setPosition(currentFruit, { x: x, y: currentFruit.position.y });
+                // Matter 바디의 위치 업데이트 (Y 위치는 고정)
+                Body.setPosition(currentFruit, { x: x, y: currentFruit.position.y });
             }
         });
         
         // 클릭 시 과일 떨어뜨리기
-        document.getElementById(CONTAINER_ID).addEventListener('click', () => {
-            if (currentFruit && currentFruit.isSleeping) {
-                Matter.Body.setSleep(currentFruit, false); // 잠자기 상태 해제 (중력 적용 시작)
+        gameCanvas.addEventListener('click', () => {
+            if (currentFruit && currentFruit.isSleeping && !isDropping) {
+                isDropping = true; // 떨어뜨리는 중 플래그 설정
+                Body.setSleep(currentFruit, false); // 잠자기 상태 해제 (중력 적용 시작)
+                currentFruit.isSensor = false; // 충돌 감지 활성화
                 fruits.push(currentFruit);
                 currentFruit = null;
 
                 // 다음 과일 생성은 잠시 지연 후 실행
-                setTimeout(spawnNextFruit, 1000); 
+                setTimeout(() => {
+                    isDropping = false; // 플래그 해제
+                    spawnNextFruit();
+                }, 1000); 
             }
         });
 
@@ -300,70 +342,59 @@
                 const bodyA = pair.bodyA;
                 const bodyB = pair.bodyB;
 
-                // 두 과일이 모두 과일인지 확인
-                const isFruitA = bodyA.label.startsWith('fruit');
-                const isFruitB = bodyB.label.startsWith('fruit');
-                
-                if (isFruitA && isFruitB) {
+                // 두 바디 모두 과일이고, 같은 종류이며, 합쳐지는 중이 아닐 때 처리
+                if (bodyA.label.startsWith('fruit') && bodyB.label.startsWith('fruit') && 
+                    bodyA.fruitIndex === bodyB.fruitIndex && 
+                    !bodyA.isMerging && !bodyB.isMerging) {
+                        
+                    // 합치기 처리 시작
+                    bodyA.isMerging = true;
+                    bodyB.isMerging = true;
+
                     const fruitIndexA = bodyA.fruitIndex;
-                    const fruitIndexB = bodyB.fruitIndex;
-                    
-                    // 같은 종류의 과일인지 확인
-                    if (fruitIndexA === fruitIndexB) {
-                        // 합치기 처리 (더 이상 움직이지 않는 경우에만 합치도록 처리하는 것이 좋으나, 일단 단순화)
+                    const newIndex = fruitIndexA + 1;
+
+                    // 1. 기존 과일 제거 및 HTML 요소 제거
+                    World.remove(world, [bodyA, bodyB]);
+                    if (bodyA.div) bodyA.div.remove();
+                    if (bodyB.div) bodyB.div.remove();
+
+                    // 2. 배열에서 제거
+                    fruits = fruits.filter(f => f !== bodyA && f !== bodyB);
+
+                    // 3. 새 과일 생성
+                    if (newIndex < FRUITS_DATA.length) {
+                        const newFruitData = FRUITS_DATA[newIndex];
+                        const avgX = (bodyA.position.x + bodyB.position.x) / 2;
+                        const avgY = (bodyA.position.y + bodyB.position.y) / 2;
+
+                        const mergedFruit = Bodies.circle(avgX, avgY, newFruitData.radius, {
+                            label: `fruit-${newIndex}`,
+                            restitution: 0.1,
+                            friction: 0.1,
+                            density: 0.001,
+                            fruitIndex: newIndex,
+                            isMerging: false, // 새로 생성된 과일은 합쳐지는 중이 아님
+                            render: { visible: false } // Matter.js 기본 렌더링 숨김
+                        });
                         
-                        // 이미 합쳐진 상태라면 무시
-                        if (bodyA.isMerging || bodyB.isMerging) return;
+                        // HTML 요소 생성
+                        const newFruitDiv = document.createElement('div');
+                        newFruitDiv.classList.add('fruit');
+                        newFruitDiv.innerHTML = newFruitData.emoji;
+                        newFruitDiv.style.width = newFruitDiv.style.height = `${newFruitData.radius * 2}px`;
+                        newFruitDiv.style.fontSize = `${newFruitData.radius * 0.8}px`;
+                        newFruitDiv.style.backgroundColor = newFruitData.color;
                         
-                        // 합쳐지는 과일 표시
-                        bodyA.isMerging = true;
-                        bodyB.isMerging = true;
+                        mergedFruit.div = newFruitDiv;
+                        document.getElementById(CONTAINER_ID).appendChild(newFruitDiv);
 
-                        // 1. 기존 과일 제거
-                        World.remove(world, [bodyA, bodyB]);
-                        
-                        // 2. HTML 요소 제거
-                        if (bodyA.div) bodyA.div.remove();
-                        if (bodyB.div) bodyB.div.remove();
+                        World.add(world, mergedFruit);
+                        fruits.push(mergedFruit);
 
-                        // 3. 배열에서 제거
-                        fruits = fruits.filter(f => f !== bodyA && f !== bodyB);
-
-                        // 4. 새 과일 생성
-                        const newIndex = fruitIndexA + 1;
-                        if (newIndex < FRUITS_DATA.length) {
-                            const newFruitData = FRUITS_DATA[newIndex];
-                            const avgX = (bodyA.position.x + bodyB.position.x) / 2;
-                            const avgY = (bodyA.position.y + bodyB.position.y) / 2;
-
-                            const mergedFruit = Bodies.circle(avgX, avgY, newFruitData.radius, {
-                                label: `fruit-${newIndex}`,
-                                restitution: 0.1,
-                                friction: 0.1,
-                                density: 0.001,
-                                fruitIndex: newIndex,
-                                render: { fillStyle: newFruitData.color }
-                            });
-                            
-                            // HTML 요소 생성
-                            const newFruitDiv = document.createElement('div');
-                            newFruitDiv.classList.add('fruit');
-                            newFruitDiv.innerHTML = newFruitData.emoji;
-                            newFruitDiv.style.width = newFruitDiv.style.height = `${newFruitData.radius * 2}px`;
-                            newFruitDiv.style.fontSize = `${newFruitData.radius * 0.8}px`;
-                            newFruitDiv.style.backgroundColor = newFruitData.color;
-                            newFruitDiv.style.zIndex = 50;
-                            
-                            mergedFruit.div = newFruitDiv;
-                            document.getElementById(CONTAINER_ID).appendChild(newFruitDiv);
-
-                            World.add(world, mergedFruit);
-                            fruits.push(mergedFruit);
-
-                            // 점수 업데이트 (단계 * 100점)
-                            score += (newIndex + 1) * 100; 
-                            document.getElementById('score').textContent = score;
-                        }
+                        // 점수 업데이트 (단계 * 100점)
+                        score += (newIndex + 1) * 100; 
+                        document.getElementById('score').textContent = score;
                     }
                 }
             });
@@ -371,35 +402,34 @@
 
         // --- 5. 게임 오버 조건 ---
         
-        Events.on(engine, 'beforeUpdate', () => {
-            // 게임 오버 조건: 과일이 특정 높이 (예: 보드 상단 100px)를 넘어가서 1초 이상 머무를 경우
-            const gameOverLine = 100; 
+        const GAME_OVER_LINE_Y = 100; // 캔버스 상단에서 100px 지점
+        let gameOverTimer = null;
 
-            fruits.forEach(fruit => {
-                if (fruit.position.y < gameOverLine && fruit.velocity.y < 0.1) {
-                    // TODO: 타이머를 설정하여 일정 시간 동안 위에 머물렀는지 확인하는 로직 추가 필요
-                    // 지금은 단순화를 위해 임시 주석 처리
-                    /*
-                    if (!fruit.isAboveLineTimer) {
-                         fruit.isAboveLineTimer = setTimeout(() => {
-                             if (fruit.position.y < gameOverLine) {
-                                 // gameOver();
-                             }
-                         }, 1000);
-                    }
-                    */
-                } else {
-                    // clearTimeout(fruit.isAboveLineTimer);
-                    // fruit.isAboveLineTimer = null;
+        Events.on(engine, 'beforeUpdate', () => {
+            // 과일이 특정 높이(GAME_OVER_LINE_Y)를 넘어선 경우를 확인
+            const isAnyFruitTooHigh = fruits.some(fruit => 
+                fruit.position.y - fruit.circleRadius < GAME_OVER_LINE_Y && fruit.velocity.y < 0.1
+            );
+
+            if (isAnyFruitTooHigh) {
+                if (!gameOverTimer) {
+                    // 1초 동안 위에 머무르면 게임 오버
+                    gameOverTimer = setTimeout(() => {
+                        gameOver();
+                    }, 1000); 
                 }
-            });
+            } else {
+                // 과일이 내려갔으면 타이머 리셋
+                clearTimeout(gameOverTimer);
+                gameOverTimer = null;
+            }
         });
 
 
         function gameOver() {
             // 엔진 중지
+            Runner.stop(runner);
             Render.stop(render);
-            Engine.stop(engine);
             
             document.getElementById('final-score').textContent = score;
             document.getElementById('game-over-overlay').style.display = 'flex';
@@ -407,7 +437,6 @@
 
         // --- 초기 시작 ---
         document.addEventListener('DOMContentLoaded', () => {
-            // DOM 로드 후 게임 시작
             startGame(); 
         });
 
