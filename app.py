@@ -17,7 +17,7 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "_ZBcX8Ec50")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyAM7Sc6RxrYBr_uSFCbSp8tuUGg9h2sPSM")
 
 # =========================================================================
-# 2. 페이지 라우트 (수정된 부분: 스도쿠, 2048 라우트 추가)
+# 2. 페이지 라우트
 # =========================================================================
 
 @app.route('/')
@@ -55,7 +55,6 @@ def tetris_game():
     """테트리스 게임 페이지를 렌더링합니다."""
     return render_template('tetris.html')
 
-# --- 새로 추가된 게임 라우트 ---
 @app.route('/game/sudoku')
 def sudoku_game():
     """스도쿠 게임 페이지를 렌더링합니다."""
@@ -65,7 +64,13 @@ def sudoku_game():
 def game_2048():
     """2048 게임 페이지를 렌더링합니다."""
     return render_template('2048.html')
-# ------------------------------
+
+# --- 새로 추가된 과일 게임 라우트 ---
+@app.route('/game/fruits')
+def fruits_game():
+    """과일 합치기 게임 페이지를 렌더링합니다."""
+    return render_template('fruits_game.html')
+# --------------------------------------
 
 # =========================================================================
 # 3. 네이버 뉴스 검색 API 엔드포인트
