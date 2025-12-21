@@ -27,12 +27,12 @@
             border: 4px solid #10b981; /* 에메랄드 500 */
             border-radius: 12px;
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-            overflow: hidden; /* Matter.js 캔버스나 과일이 넘치지 않도록 */
+            overflow: hidden; 
         }
 
         #score-board {
             position: relative;
-            z-index: 200; /* 캔버스 위에 표시 */
+            z-index: 200; 
             padding: 15px;
             background-color: #059669; /* 에메랄드 600 */
             color: white;
@@ -60,6 +60,7 @@
             position: absolute;
             top: 0;
             left: 0;
+            cursor: pointer; /* 커서를 포인터로 변경하여 사용자에게 클릭 가능함을 알림 */
         }
 
         /* 과일 스타일링 */
@@ -72,10 +73,8 @@
             font-weight: 900;
             color: #fff;
             user-select: none;
-            /* Matter.js가 변환한 위치에 맞추기 위해 transform 사용 */
             transform: translate(-50%, -50%); 
-            /* 부드러운 움직임을 위해 transition을 제거하고 Matter.js의 업데이트를 따르도록 함 */
-            z-index: 100; /* 캔버스 위에 표시 */
+            z-index: 100; 
         }
 
         /* 게임 오버 오버레이 */
@@ -135,6 +134,8 @@
         let fruits = []; 
         let isDropping = false; 
 
+        let gameCanvasElement = null; // **실제 캔버스 요소 (이벤트 리스너 바인딩 대상)**
+
         // 과일 크기와 색상 정의 (1~11단계)
         const FRUITS_DATA = [
             { name: '체리', radius: 15, color: '#f87171', emoji: '🍒' },    // 1
@@ -155,11 +156,10 @@
         function setupEngine() {
             engine = Engine.create();
             world = engine.world;
-            world.gravity.y = 1; // 기본 중력 설정
+            world.gravity.y = 1; 
 
             const canvasContainer = document.getElementById(CONTAINER_ID);
 
-            // Render.create는 캔버스를 생성하고 'element'에 지정된 DOM 요소에 삽입합니다.
             render = Render.create({
                 element: canvasContainer,
                 engine: engine,
@@ -175,8 +175,14 @@
             });
 
             runner = Runner.create();
-            Runner.run(runner, engine); // Matter.js 엔진 루프 시작
-            Render.run(render);          // 렌더링 루프 시작
+            Runner.run(runner, engine); 
+            Render.run(render);
+
+            // **추가된 핵심 로직: Matter.js가 생성한 캔버스 요소를 참조**
+            gameCanvasElement = canvasContainer.querySelector('canvas');
+            if (gameCanvasElement) {
+                setupInputListeners(gameCanvasElement); // 이벤트 리스너 설정 함수 호출
+            }
         }
 
         function createBoundaries() {
@@ -212,6 +218,12 @@
             // 기존 캔버스 및 모든 과일 div 요소 정리
             const canvasContainer = document.getElementById(CONTAINER_ID);
             canvasContainer.innerHTML = ''; 
+            
+            // **기존 리스너 제거 (중요: 중복 방지)**
+            if (gameCanvasElement) {
+                gameCanvasElement.removeEventListener('mousemove', handleMouseMove);
+                gameCanvasElement.removeEventListener('click', handleClick);
+            }
 
             setupEngine();
             createBoundaries();
@@ -221,14 +233,12 @@
             document.getElementById('score').textContent = score;
             document.getElementById('game-over-overlay').style.display = 'none';
 
-            // 0.5초 후 첫 과일 생성
             setTimeout(spawnNextFruit, 500); 
         }
 
         // --- 2. 과일 생성 및 렌더링 ---
 
         function getRandomFruitIndex() {
-            // 초기에는 0번(체리)부터 4번(레몬)까지만 랜덤하게 나오도록 제한
             return Math.floor(Math.random() * 5); 
         }
 
@@ -237,11 +247,10 @@
 
             const fruitIndex = getRandomFruitIndex();
             const fruitData = FRUITS_DATA[fruitIndex];
-            const radius = fruitData.radius; // **여기에 radius 변수 저장**
+            const radius = fruitData.radius; 
             
-            // 과일 생성 위치 (보드 중앙 상단)
             const x = GAME_WIDTH / 2;
-            const y = radius; // 캔버스 상단 (0)에서 과일 반지름만큼 내려와 생성
+            const y = radius; 
 
             const newFruit = Bodies.circle(x, y, radius, {
                 label: `fruit-${fruitIndex}`,
@@ -250,17 +259,12 @@
                 density: 0.001,   
                 isSleeping: true, 
                 isSensor: true,   
-                render: {
-                    fillStyle: fruitData.color,
-                    visible: false // Matter.js 기본 렌더링은 숨김
-                },
+                render: { visible: false },
                 fruitIndex: fruitIndex 
             });
             
-            // Matter 바디에 HTML 렌더링을 위한 속성 추가 (중요)
             newFruit.radius = radius; 
             
-            // 과일 렌더링을 위한 HTML 요소 생성
             const fruitDiv = document.createElement('div');
             fruitDiv.classList.add('fruit');
             fruitDiv.innerHTML = fruitData.emoji;
@@ -268,7 +272,7 @@
             fruitDiv.style.fontSize = `${radius * 0.8}px`;
             fruitDiv.style.backgroundColor = fruitData.color;
             
-            newFruit.div = fruitDiv; // Matter 바디와 div를 연결
+            newFruit.div = fruitDiv; 
             document.getElementById(CONTAINER_ID).appendChild(fruitDiv);
 
             currentFruit = newFruit;
@@ -296,28 +300,23 @@
 
         // --- 3. 사용자 입력 처리 (떨어뜨리기) ---
         
-        const gameCanvas = document.getElementById(CONTAINER_ID);
-
-        // 마우스 이동 시 현재 과일의 x 위치 업데이트
-        gameCanvas.addEventListener('mousemove', (e) => {
+        // 이벤트 핸들러 함수 분리
+        function handleMouseMove(e) {
             if (currentFruit && currentFruit.isSleeping && !isDropping) {
-                const rect = e.currentTarget.getBoundingClientRect();
-                // 캔버스 내에서의 상대적인 X 위치
+                // 이벤트 타겟이 gameCanvasElement이므로, rect.left/top을 사용하여 상대적 위치 계산
+                const rect = e.currentTarget.getBoundingClientRect(); 
                 let x = e.clientX - rect.left; 
                 
-                // **수정된 부분: currentFruit.radius를 사용하여 정확한 반지름 참조**
                 const minX = currentFruit.radius + WALL_THICKNESS;
                 const maxX = GAME_WIDTH - currentFruit.radius - WALL_THICKNESS;
                 
                 x = Math.max(minX, Math.min(maxX, x));
                 
-                // Matter 바디의 위치 업데이트 (Y 위치는 고정)
                 Body.setPosition(currentFruit, { x: x, y: currentFruit.position.y });
             }
-        });
+        }
         
-        // 클릭 시 과일 떨어뜨리기
-        gameCanvas.addEventListener('click', () => {
+        function handleClick() {
             if (currentFruit && currentFruit.isSleeping && !isDropping) {
                 isDropping = true; 
                 Body.setSleep(currentFruit, false); 
@@ -325,13 +324,18 @@
                 fruits.push(currentFruit);
                 currentFruit = null;
 
-                // 다음 과일 생성은 잠시 지연 후 실행
                 setTimeout(() => {
                     isDropping = false; 
                     spawnNextFruit();
                 }, 1000); 
             }
-        });
+        }
+
+        // **새로 추가된 이벤트 리스너 설정 함수**
+        function setupInputListeners(element) {
+            element.addEventListener('mousemove', handleMouseMove);
+            element.addEventListener('click', handleClick);
+        }
 
         // --- 4. 충돌 감지 및 합치기 로직 ---
 
@@ -365,7 +369,7 @@
                         const newFruitData = FRUITS_DATA[newIndex];
                         const avgX = (bodyA.position.x + bodyB.position.x) / 2;
                         const avgY = (bodyA.position.y + bodyB.position.y) / 2;
-                        const newRadius = newFruitData.radius; // **새 반지름 변수**
+                        const newRadius = newFruitData.radius; 
 
                         const mergedFruit = Bodies.circle(avgX, avgY, newRadius, {
                             label: `fruit-${newIndex}`,
@@ -377,10 +381,8 @@
                             render: { visible: false } 
                         });
                         
-                        // Matter 바디에 HTML 렌더링을 위한 속성 추가 (중요)
                         mergedFruit.radius = newRadius;
 
-                        // HTML 요소 생성
                         const newFruitDiv = document.createElement('div');
                         newFruitDiv.classList.add('fruit');
                         newFruitDiv.innerHTML = newFruitData.emoji;
@@ -394,7 +396,6 @@
                         World.add(world, mergedFruit);
                         fruits.push(mergedFruit);
 
-                        // 점수 업데이트 (단계 * 100점)
                         score += (newIndex + 1) * 100; 
                         document.getElementById('score').textContent = score;
                     }
@@ -408,9 +409,7 @@
         let gameOverTimer = null;
 
         Events.on(engine, 'beforeUpdate', () => {
-            // 과일이 특정 높이(GAME_OVER_LINE_Y)를 넘어선 경우를 확인
             const isAnyFruitTooHigh = fruits.some(fruit => 
-                // fruit.circleRadius 대신 fruit.radius를 사용 (custom property)
                 (fruit.position.y - fruit.radius) < GAME_OVER_LINE_Y && fruit.velocity.y < 0.1 
             );
 
@@ -428,10 +427,15 @@
 
 
         function gameOver() {
-            // 엔진 중지
             Runner.stop(runner);
             Render.stop(render);
             
+            // 게임 오버 시 입력 리스너 제거
+            if (gameCanvasElement) {
+                gameCanvasElement.removeEventListener('mousemove', handleMouseMove);
+                gameCanvasElement.removeEventListener('click', handleClick);
+            }
+
             document.getElementById('final-score').textContent = score;
             document.getElementById('game-over-overlay').style.display = 'flex';
         }
