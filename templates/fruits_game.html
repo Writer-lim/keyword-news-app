@@ -60,7 +60,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            cursor: pointer; /* 커서를 포인터로 변경하여 사용자에게 클릭 가능함을 알림 */
+            cursor: pointer; 
         }
 
         /* 과일 스타일링 */
@@ -73,8 +73,10 @@
             font-weight: 900;
             color: #fff;
             user-select: none;
+            /* Matter.js 바디의 중앙에 맞추기 위해 transform: translate(-50%, -50%) 사용 */
             transform: translate(-50%, -50%); 
             z-index: 100; 
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* 입체감 추가 */
         }
 
         /* 게임 오버 오버레이 */
@@ -134,7 +136,7 @@
         let fruits = []; 
         let isDropping = false; 
 
-        let gameCanvasElement = null; // **실제 캔버스 요소 (이벤트 리스너 바인딩 대상)**
+        let gameCanvasElement = null; // 실제 캔버스 요소
 
         // 과일 크기와 색상 정의 (1~11단계)
         const FRUITS_DATA = [
@@ -178,7 +180,7 @@
             Runner.run(runner, engine); 
             Render.run(render);
 
-            // **추가된 핵심 로직: Matter.js가 생성한 캔버스 요소를 참조**
+            // Matter.js가 생성한 캔버스 요소를 참조
             gameCanvasElement = canvasContainer.querySelector('canvas');
             if (gameCanvasElement) {
                 setupInputListeners(gameCanvasElement); // 이벤트 리스너 설정 함수 호출
@@ -219,10 +221,12 @@
             const canvasContainer = document.getElementById(CONTAINER_ID);
             canvasContainer.innerHTML = ''; 
             
-            // **기존 리스너 제거 (중요: 중복 방지)**
+            // 기존 리스너 제거 (중요: 중복 방지)
+            // gameCanvasElement가 null이 아닐 경우에만 제거 시도
             if (gameCanvasElement) {
                 gameCanvasElement.removeEventListener('mousemove', handleMouseMove);
                 gameCanvasElement.removeEventListener('click', handleClick);
+                gameCanvasElement = null; // 리스너를 제거한 후 레퍼런스 초기화
             }
 
             setupEngine();
@@ -233,6 +237,7 @@
             document.getElementById('score').textContent = score;
             document.getElementById('game-over-overlay').style.display = 'none';
 
+            // Matter.js와 캔버스가 완전히 준비될 시간을 주기 위해 지연
             setTimeout(spawnNextFruit, 500); 
         }
 
@@ -269,7 +274,9 @@
             fruitDiv.classList.add('fruit');
             fruitDiv.innerHTML = fruitData.emoji;
             fruitDiv.style.width = fruitDiv.style.height = `${radius * 2}px`;
-            fruitDiv.style.fontSize = `${radius * 0.8}px`;
+            // **핵심 수정**: 이모지 크기가 너무 작아 안 보이는 문제 해결.
+            // 폰트 크기를 반지름 * 1.5배로 크게 설정하여 과일이 확실히 보이도록 함.
+            fruitDiv.style.fontSize = `${radius * 1.5}px`; 
             fruitDiv.style.backgroundColor = fruitData.color;
             
             newFruit.div = fruitDiv; 
@@ -303,7 +310,7 @@
         // 이벤트 핸들러 함수 분리
         function handleMouseMove(e) {
             if (currentFruit && currentFruit.isSleeping && !isDropping) {
-                // 이벤트 타겟이 gameCanvasElement이므로, rect.left/top을 사용하여 상대적 위치 계산
+                // 캔버스 요소를 기준으로 상대 위치 계산
                 const rect = e.currentTarget.getBoundingClientRect(); 
                 let x = e.clientX - rect.left; 
                 
@@ -331,8 +338,9 @@
             }
         }
 
-        // **새로 추가된 이벤트 리스너 설정 함수**
+        // 이벤트 리스너 설정 함수
         function setupInputListeners(element) {
+            // 이전에 리스너가 추가되지 않았을 경우에만 추가 (중복 방지)
             element.addEventListener('mousemove', handleMouseMove);
             element.addEventListener('click', handleClick);
         }
@@ -387,7 +395,8 @@
                         newFruitDiv.classList.add('fruit');
                         newFruitDiv.innerHTML = newFruitData.emoji;
                         newFruitDiv.style.width = newFruitDiv.style.height = `${newRadius * 2}px`;
-                        newFruitDiv.style.fontSize = `${newRadius * 0.8}px`;
+                        // **핵심 수정**: 병합 후에도 폰트 크기 강제 설정
+                        newFruitDiv.style.fontSize = `${newRadius * 1.5}px`; 
                         newFruitDiv.style.backgroundColor = newFruitData.color;
                         
                         mergedFruit.div = newFruitDiv;
@@ -430,7 +439,6 @@
             Runner.stop(runner);
             Render.stop(render);
             
-            // 게임 오버 시 입력 리스너 제거
             if (gameCanvasElement) {
                 gameCanvasElement.removeEventListener('mousemove', handleMouseMove);
                 gameCanvasElement.removeEventListener('click', handleClick);
