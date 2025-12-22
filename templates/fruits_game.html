@@ -31,11 +31,11 @@
         }
 
         #score-board {
-            position: absolute; /* 절대 위치 지정 */
+            position: absolute; 
             top: 0;
             left: 0;
             width: 100%;
-            height: 50px; /* 점수판 높이 고정 */
+            height: 50px; 
             z-index: 200; 
             padding: 10px 15px;
             background-color: #059669; 
@@ -52,7 +52,7 @@
         /* Matter.js 캔버스를 컨테이너의 물리 영역 시작점(Y=50)에 맞춤 */
         #game-canvas {
             position: absolute;
-            top: 50px; /* 점수판 높이만큼 아래로 오프셋 */
+            top: 50px; /* **캔버스 컨테이너 오프셋 유지** */
             left: 0;
             width: 400px;
             height: 600px;
@@ -81,7 +81,7 @@
             transform: translate(-50%, -50%); 
             z-index: 100; 
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); 
-            line-height: 1; /* 이모지 높이 맞추기 */
+            line-height: 1; 
         }
 
         /* 게임 오버 오버레이 */
@@ -127,11 +127,11 @@
         // --- Matter.js 초기화 ---
         const { Engine, Render, World, Bodies, Events, Body, Runner } = Matter; 
 
-        const GAME_WIDTH = 400; // 캔버스 너비
-        const GAME_HEIGHT = 600; // 캔버스 높이 (점수판 아래 물리 영역)
+        const GAME_WIDTH = 400; 
+        const GAME_HEIGHT = 600; 
         const WALL_THICKNESS = 20;
         const CANVAS_CONTAINER_ID = 'game-canvas';
-        const GAME_CONTAINER_ID = 'game-container'; // 이벤트 바인딩 대상
+        const SCORE_BOARD_HEIGHT = 50; // CSS에서 top: 50px로 설정됨
 
         let engine;
         let world;
@@ -142,10 +142,10 @@
         let fruits = []; 
         let isDropping = false; 
 
-        // 이벤트 리스너를 바인딩할 상위 컨테이너 요소
-        let gameContainerElement = null; 
+        // 이벤트 리스너를 바인딩할 캔버스 컨테이너 요소 (마우스 좌표 기준)
+        let gameCanvasContainer = null; 
 
-        // 과일 데이터 (반지름과 이모지 정의)
+        // 과일 데이터
         const FRUITS_DATA = [
             { name: '체리', radius: 15, color: '#f87171', emoji: '🍒' },    // 1
             { name: '딸기', radius: 20, color: '#f43f5e', emoji: '🍓' },    // 2
@@ -159,10 +159,6 @@
             { name: '멜론', radius: 60, color: '#4ade80', emoji: '🍈' },    // 10
             { name: '수박', radius: 65, color: '#22c55e', emoji: '🍉' }     // 11
         ];
-        
-        // 점수판 높이 (Matter.js 좌표계에 영향 X, CSS/이벤트 좌표에만 영향)
-        const SCORE_BOARD_HEIGHT = 50; 
-
 
         // --- 1. 게임 환경 설정 및 초기화 ---
 
@@ -171,10 +167,10 @@
             world = engine.world;
             world.gravity.y = 1; 
 
-            const canvasContainer = document.getElementById(CANVAS_CONTAINER_ID);
+            gameCanvasContainer = document.getElementById(CANVAS_CONTAINER_ID);
 
             render = Render.create({
-                element: canvasContainer,
+                element: gameCanvasContainer,
                 engine: engine,
                 options: {
                     width: GAME_WIDTH,
@@ -192,14 +188,13 @@
             Render.run(render);
 
             // 이벤트 리스너 설정
-            gameContainerElement = document.getElementById(GAME_CONTAINER_ID);
-            if (gameContainerElement) {
-                setupInputListeners(gameContainerElement); 
+            if (gameCanvasContainer) {
+                setupInputListeners(gameCanvasContainer); 
             }
         }
 
         function createBoundaries() {
-            // 바닥 (Floor): 캔버스 높이 (600)의 맨 아래
+            // 바닥 (Floor)
             const floor = Bodies.rectangle(GAME_WIDTH / 2, GAME_HEIGHT + WALL_THICKNESS / 2, GAME_WIDTH, WALL_THICKNESS, { 
                 isStatic: true, 
                 label: 'floor',
@@ -233,10 +228,9 @@
             canvasContainer.innerHTML = ''; 
             
             // 기존 리스너 제거 (중복 방지)
-            if (gameContainerElement) {
-                gameContainerElement.removeEventListener('mousemove', handleMouseMove);
-                gameContainerElement.removeEventListener('click', handleClick);
-                gameContainerElement = null;
+            if (gameCanvasContainer) {
+                gameCanvasContainer.removeEventListener('mousemove', handleMouseMove);
+                gameCanvasContainer.removeEventListener('click', handleClick);
             }
 
             setupEngine();
@@ -284,7 +278,6 @@
             fruitDiv.classList.add('fruit');
             fruitDiv.innerHTML = fruitData.emoji;
             fruitDiv.style.width = fruitDiv.style.height = `${radius * 2}px`;
-            // 폰트 크기를 반지름의 1.8배로 크게 설정
             fruitDiv.style.fontSize = `${radius * 1.8}px`; 
             fruitDiv.style.backgroundColor = fruitData.color;
             
@@ -301,6 +294,7 @@
             fruits.forEach(fruit => {
                 if (fruit.div) {
                     fruit.div.style.left = `${fruit.position.x}px`;
+                    // **핵심 수정: Y 위치 보정 불필요. 캔버스 컨테이너 내에서 Matter.js 위치를 따름**
                     fruit.div.style.top = `${fruit.position.y}px`;
                 }
             });
@@ -309,7 +303,8 @@
             if (currentFruit && currentFruit.isSleeping) {
                  if (currentFruit.div) {
                     currentFruit.div.style.left = `${currentFruit.position.x}px`;
-                    currentFruit.div.style.top = `${currentFruit.position.y}px`;
+                    // **핵심 수정: Y 위치 보정 불필요. 캔버스 컨테이너 내에서 Matter.js 위치를 따름**
+                    fruit.div.style.top = `${currentFruit.position.y}px`;
                 }
             }
         });
@@ -319,16 +314,9 @@
         // 이벤트 핸들러 함수 분리
         function handleMouseMove(e) {
             if (currentFruit && currentFruit.isSleeping && !isDropping) {
-                // game-container를 기준으로 상대 위치 계산
+                // game-canvas 컨테이너를 기준으로 상대 위치 계산
                 const rect = e.currentTarget.getBoundingClientRect(); 
-                let clientX = e.clientX - rect.left;
-                let clientY = e.clientY - rect.top;
-
-                // Y 좌표가 점수판 영역(50px)보다 작으면 무시
-                if (clientY < SCORE_BOARD_HEIGHT) return;
-
-                // **Matter.js 캔버스 내의 X 좌표**
-                let x = clientX; 
+                let x = e.clientX - rect.left; 
                 
                 const minX = currentFruit.radius + WALL_THICKNESS;
                 const maxX = GAME_WIDTH - currentFruit.radius - WALL_THICKNESS;
@@ -454,9 +442,9 @@
             Runner.stop(runner);
             Render.stop(render);
             
-            if (gameContainerElement) {
-                gameContainerElement.removeEventListener('mousemove', handleMouseMove);
-                gameContainerElement.removeEventListener('click', handleClick);
+            if (gameCanvasContainer) {
+                gameCanvasContainer.removeEventListener('mousemove', handleMouseMove);
+                gameCanvasContainer.removeEventListener('click', handleClick);
             }
 
             document.getElementById('final-score').textContent = score;
